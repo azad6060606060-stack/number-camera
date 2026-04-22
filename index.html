@@ -1,96 +1,76 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MATRIX LIVE CAMERA</title>
-    <style>
-        body { margin: 0; background: #000; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
-        canvas { width: 100vw; height: 100vh; display: block; }
-        #startBtn {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            padding: 20px 40px; background: #000; color: #0f0; border: 2px solid #0f0;
-            font-family: monospace; font-size: 20px; cursor: pointer; z-index: 10;
-            box-shadow: 0 0 20px #0f0;
-        }
-        video { position: absolute; visibility: hidden; }
-    </style>
-</head>
-<body>
+import cv2
+import numpy as np
+from IPython.display import display, Javascript
+from google.colab.output import eval_js
+from base64 import b64decode
 
-    <button id="startBtn">ПОДКЛЮЧИТЬ КАМЕРУ</button>
-    <canvas id="c"></canvas>
-    <video id="v" autoplay playsinline muted></video>
+# 1. Функция JavaScript для запуска камеры в браузере
+def take_photo(filename='photo.jpg', quality=0.8):
+  js = Javascript('''
+    async function takePhoto(quality) {
+      const div = document.createElement('div');
+      const video = document.createElement('video');
+      video.style.display = 'block';
+      const stream = await navigator.mediaDevices.getUserMedia({video: true});
 
-    <script>
-        const btn = document.getElementById('startBtn');
-        const v = document.getElementById('v');
-        const c = document.getElementById('c');
-        const ctx = c.getContext('2d', { willReadFrequently: true });
-        
-        const fontSize = 12;
-        const symbols = "0123456789".split("");
+      document.body.appendChild(div);
+      div.appendChild(video);
+      video.srcObject = stream;
+      await video.play();
 
-        btn.onclick = async () => {
-            btn.style.display = 'none';
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" }, 
-                    audio: false 
-                });
-                v.srcObject = stream;
-                await v.play();
-                render();
-            } catch (e) {
-                alert("Ошибка камеры: " + e);
-            }
-        };
+      // Ждем клика, чтобы сделать кадр
+      await new Promise((resolve) => {
+        const btn = document.createElement('button');
+        btn.textContent = 'Распознать цифры';
+        div.appendChild(btn);
+        btn.onclick = resolve;
+      });
 
-        function render() {
-            c.width = window.innerWidth;
-            c.height = window.innerHeight;
-            
-            const cols = Math.floor(c.width / fontSize);
-            const rows = Math.floor(c.height / fontSize);
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      stream.getVideoTracks()[0].stop();
+      div.remove();
+      return canvas.toDataURL('image/jpeg', quality);
+    }
+    ''')
+  display(js)
+  data = eval_js('takePhoto({})'.format(quality))
+  binary = b64decode(data.split(',')[1])
+  with open(filename, 'wb') as f:
+    f.write(binary)
+  return filename
 
-            // Рисуем чёрный фон
-            ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, c.width, c.height);
+# 2. Основной цикл программы
+try:
+  print("Камера запускается...")
+  filename = take_photo()
+  
+  # Загружаем фото в OpenCV
+  img = cv2.imread(filename)
+  gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+  
+  # Применяем порог (threshold), чтобы оставить только четкие линии (как цифры)
+  # Это создаст эффект "матрицы" или сканера цифр
+  thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                 cv2.THRESH_BINARY_INV, 11, 2)
 
-            // Создаем временный холст в памяти для анализа яркости кадра
-            const tempC = document.createElement('canvas');
-            const tempCtx = tempC.getContext('2d');
-            tempC.width = cols;
-            tempC.height = rows;
-            tempCtx.drawImage(v, 0, 0, cols, rows);
-            const imgData = tempCtx.getImageData(0, 0, cols, rows).data;
+  # Ищем контуры, которые похожи на символы
+  contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+  
+  for cnt in contours:
+      x, y, w, h = cv2.boundingRect(cnt)
+      # Если объект похож по размеру на цифру, рисуем рамку
+      if h > 10 and w > 5:
+          cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+          cv2.putText(img, "NUM", (x, y-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
-            ctx.font = fontSize + "px monospace";
-            ctx.textAlign = "center";
+  # Сохраняем и показываем результат
+  cv2.imwrite('result.jpg', img)
+  from google.colab.patches import cv2_imshow
+  print("Результат обработки:")
+  cv2_imshow(img)
 
-            for (let y = 0; y < rows; y++) {
-                for (let x = 0; x < cols; x++) {
-                    const i = (y * cols + x) * 4;
-                    const brightness = (imgData[i] + imgData[i+1] + imgData[i+2]) / 3;
-
-                    // Динамическая прозрачность: светлые места ярче, темные — почти невидимы
-                    const alpha = 0.05 + (brightness / 255) * 0.95;
-                    
-                    if (brightness > 180) {
-                        ctx.fillStyle = rgba(180, 255, 180, ${alpha}); // Светло-зеленый (засвет)
-                        ctx.shadowBlur = 5;
-                        ctx.shadowColor = "#0f0";
-                    } else {
-                        ctx.fillStyle = rgba(0, 255, 0, ${alpha}); // Обычный зеленый
-                        ctx.shadowBlur = 0;
-                    }
-
-                    const char = symbols[Math.floor(Math.random() * symbols.length)];
-                    ctx.fillText(char, x * fontSize + fontSize / 2, y * fontSize + fontSize);
-                }
-            }
-            requestAnimationFrame(render);
-        }
-    </script>
-</body>
-</html>
+except Exception as err:
+  print(str(err))
