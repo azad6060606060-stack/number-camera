@@ -2,51 +2,96 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Рабочий Проект</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mafia Mobile Edition</title>
     <style>
-        /* CSS прямо здесь, чтобы всё отображалось корректно */
         body {
-            font-family: sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
             margin: 0;
-            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
         }
-        .container {
+        .game-card {
+            width: 85%;
+            max-width: 400px;
+            background: #2d2d2d;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             text-align: center;
-            background: white;
+            border: 1px solid #444;
+        }
+        h1 { color: #e74c3c; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
+        .role-display {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
             padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border: 2px dashed #555;
+            border-radius: 10px;
+            min-height: 30px;
         }
         button {
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #007bff;
+            background-color: #e74c3c;
             color: white;
             border: none;
-            border-radius: 5px;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.1s, background-color 0.2s;
+            -webkit-tap-highlight-color: transparent;
         }
+        button:active {
+            transform: scale(0.95);
+            background-color: #c0392b;
+        }
+        .status { color: #888; margin-top: 15px; font-size: 14px; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>Все работает!</h1>
-        <p>Этот код адаптирован под мобильные устройства и iPhone.</p>
-        <button onclick="testFunc()">Нажми меня</button>
-        <div id="result"></div>
+    <div class="game-card">
+        <h1>Мафия</h1>
+        <div id="screen">
+            <p>Нажмите кнопку, чтобы узнать свою роль в этом раунде</p>
+            <div class="role-display" id="roleText">???</div>
+            <button onclick="getRole()">УЗНАТЬ РОЛЬ</button>
+        </div>
+        <p class="status" id="statusInfo">Готов к началу игры</p>
     </div>
 
     <script>
-        // JavaScript без ошибок
-        function testFunc() {
-            document.getElementById('result').innerHTML = "<p style='color: green;'>Кнопка нажата, скрипт работает отлично!</p>";
-            console.log("Проверка пройдена");
+        const roles = [
+            {name: "МАФИЯ", color: "#e74c3c", msg: "Твоя цель — устранить мирных жителей."},
+            {name: "МИРНЫЙ ЖИТЕЛЬ", color: "#2ecc71", msg: "Найди мафию, пока не стало слишком поздно."},
+            {name: "ШЕРИФ", color: "#3498db", msg: "Ты можешь проверять игроков ночью."},
+            {name: "ДОКТОР", color: "#f1c40f", msg: "Выбери, кого спасти этой ночью."}
+        ];
+
+        function getRole() {
+            const display = document.getElementById('roleText');
+            const status = document.getElementById('statusInfo');
+            
+            // Вибрация для мобильных устройств (если поддерживается)
+            if (navigator.vibrate) navigator.vibrate(50);
+
+            // Случайный выбор роли
+            const randomRole = roles[Math.floor(Math.random() * roles.length)];
+            
+            display.innerText = randomRole.name;
+            display.style.color = randomRole.color;
+            display.style.borderColor = randomRole.color;
+            
+            status.innerText = randomRole.msg;
         }
     </script>
 </body>
