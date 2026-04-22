@@ -3,158 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Matrix GitHub Edition</title>
+    <title>Matrix Live GitHub</title>
     <style>
-        body {
-            margin: 0;
-            background-color: #000;
-            overflow: hidden;
-            font-family: 'Courier New', Courier, monospace;
-        }
-
-        /* Кнопки интерфейса */
-        .ui-panel {
-            position: absolute;
-            bottom: 30px;
-            left: 0;
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
+        body { margin: 0; background: #000; overflow: hidden; font-family: monospace; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        
+        .ui {
+            position: absolute; bottom: 40px; left: 0; width: 100%;
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
             z-index: 100;
         }
 
         button {
-            background: rgba(0, 0, 0, 0.8);
-            color: #0f0;
-            border: 1px solid #0f0;
-            padding: 15px 25px;
-            border-radius: 5px;
-            font-weight: bold;
-            text-transform: uppercase;
-            cursor: pointer;
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
-            width: 80%;
-            max-width: 300px;
+            width: 85%; max-width: 300px; padding: 18px;
+            background: rgba(0, 20, 0, 0.9); color: #0f0;
+            border: 1px solid #0f0; border-radius: 8px;
+            font-size: 16px; font-weight: bold; text-transform: uppercase;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+            -webkit-tap-highlight-color: transparent;
         }
 
-        button:active {
-            background: #0f0;
-            color: #000;
-        }
-
-        #matrix-canvas {
-            display: block;
-            width: 100vw;
-            height: 100vh;
-        }
-
-        video { position: absolute; visibility: hidden; pointer-events: none; }
+        button:active { background: #0f0; color: #000; }
+        video { position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
     </style>
 </head>
 <body>
 
-    <canvas id="matrix-canvas"></canvas>
-    <video id="video" autoplay playsinline muted></video>
+    <canvas id="c"></canvas>
+    <video id="v" autoplay playsinline muted></video>
 
-    <div class="ui-panel">
-        <button id="switchBtn" onclick="switchCamera()">Сменить камеру</button>
-        <button id="startBtn" onclick="toggleMatrix()">Стать частью кода</button>
+    <div class="ui">
+        <button id="camBtn">Сменить камеру</button>
+        <button id="startBtn">Стать частью кода</button>
     </div>
 
     <script>
-        const canvas = document.getElementById('matrix-canvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        const video = document.getElementById('video');
-        
-        let currentFacingMode = "environment"; // По умолчанию задняя
-        let animating = false;
-        const fontSize = 12;
-        const chars = "0123456789".split("");
+        const v = document.getElementById('v');
+        const c = document.getElementById('c');
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        const startBtn = document.getElementById('startBtn');
+        const camBtn = document.getElementById('camBtn');
 
-        // Функция запуска и остановки (Стать частью кода)
-        async function toggleMatrix() {
-            if (animating) {
-                location.reload(); // Сброс
-                return;
-            }
-            
-            document.getElementById('startBtn').innerText = "Выйти из кода";
-            await startCamera();
-            animating = true;
-            render();
-        }
+        let mode = "environment"; 
+        let active = false;
+        const fSize = 12;
+        const digits = "0123456789".split("");
 
-        // Функция смены камеры
-        async function switchCamera() {
-            currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
-            if (animating) {
-                await startCamera();
-            }
-        }
-
-        async function startCamera() {
+        // Главная функция запуска
+        async function start() {
             try {
-                if (video.srcObject) {
-                    video.srcObject.getTracks().forEach(track => track.stop());
+                if (v.srcObject) {
+                    v.srcObject.getTracks().forEach(t => t.stop());
                 }
 
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: currentFacingMode },
+                    video: { facingMode: mode }, 
                     audio: false 
                 });
-                video.srcObject = stream;
-                await video.play();
-            } catch (err) {
-                alert("Ошибка камеры: " + err.message);
+                
+                v.srcObject = stream;
+                // Ждём загрузки видео, чтобы Safari не ругался
+                await new Promise((res) => v.onloadedmetadata = res);
+                await v.play();
+                
+                if (!active) {
+                    active = true;
+                    render();
+                }
+                startBtn.innerText = "Выйти из матрицы";
+            } catch (e) {
+                alert("Ошибка! Проверь HTTPS или настройки камеры в браузере.");
             }
         }
 
+        startBtn.onclick = () => {
+            if (active) location.reload();
+            else start();
+        };
+
+        camBtn.onclick = () => {
+            mode = (mode === "environment") ? "user" : "environment";
+            if (active) start(); // Перезапуск с новой камерой
+        };
+
         function render() {
-            if (!animating) return;
+            if (!active) return;
 
-            // Адаптируем холст под экран
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            c.width = window.innerWidth;
+            c.height = window.innerHeight;
+            const cols = Math.floor(c.width / fSize);
+            const rows = Math.floor(c.height / fSize);
 
-            const cols = Math.floor(canvas.width / fontSize);
-            const rows = Math.floor(canvas.height / fontSize);
-
-            // Чёрный фон
             ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillRect(0, 0, c.width, c.height);
 
-            // Вспомогательный анализ яркости
-            const offC = document.createElement('canvas');
-            const offCtx = offC.getContext('2d');
-            offC.width = cols;
-            offC.height = rows;
-            offCtx.drawImage(video, 0, 0, cols, rows);
-            const imgData = offCtx.getImageData(0, 0, cols, rows).data;
+            // Создаем невидимый холст для сканирования пикселей
+            const tmp = document.createElement('canvas');
+            tmp.width = cols; tmp.height = rows;
+            const tCtx = tmp.getContext('2d');
+            tCtx.drawImage(v, 0, 0, cols, rows);
+            const pixels = tCtx.getImageData(0, 0, cols, rows).data;
 
-            ctx.font = fontSize + "px monospace";
+            ctx.font = fSize + "px monospace";
             ctx.textAlign = "center";
 
             for (let y = 0; y < rows; y++) {
                 for (let x = 0; x < cols; x++) {
                     const i = (y * cols + x) * 4;
-                    const brightness = (imgData[i] + imgData[i+1] + imgData[i+2]) / 3;
-
-                    // Твой алгоритм освещения:
-                    const alpha = 0.1 + (brightness / 255) * 0.9;
+                    const bright = (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
                     
-                    if (brightness > 200) {
+                    // Эффект свечения как ты просил
+                    const alpha = 0.1 + (bright / 255) * 0.9;
+                    
+                    if (bright > 190) {
                         ctx.fillStyle = rgba(200, 255, 200, ${alpha});
-                        ctx.shadowBlur = 5;
-                        ctx.shadowColor = "#0f0";
+                        ctx.shadowBlur = 4;
+                        ctx.shadowColor = "#fff";
                     } else {
                         ctx.fillStyle = rgba(0, 255, 0, ${alpha});
                         ctx.shadowBlur = 0;
                     }
 
-                    const char = chars[Math.floor(Math.random() * chars.length)];
-                    ctx.fillText(char, x * fontSize, y * fontSize);
+                    const num = digits[Math.floor(Math.random() * digits.length)];
+                    ctx.fillText(num, x * fSize + fSize/2, y * fSize + fSize);
                 }
             }
             requestAnimationFrame(render);
