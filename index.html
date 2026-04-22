@@ -3,55 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matrix Face</title>
+    <title>Matrix Final</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; display: flex; flex-direction: column; align-items: center; }
+        body { margin: 0; overflow: hidden; background: #000; color: #0f0; font-family: monospace; }
         canvas { display: block; }
-        .controls { position: absolute; bottom: 20px; display: flex; gap: 10px; }
-        button { padding: 12px; background: none; color: #0f0; border: 1px solid #0f0; cursor: pointer; font-family: monospace; }
+        .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; }
+        button { padding: 15px 25px; background: black; color: #0f0; border: 2px solid #0f0; cursor: pointer; font-weight: bold; text-transform: uppercase; }
+        #errorLog { position: absolute; top: 10px; left: 10px; font-size: 12px; color: red; pointer-events: none; }
     </style>
 </head>
 <body>
+    <div id="errorLog"></div>
     <canvas id="canvas"></canvas>
     <div class="controls">
-        <button id="switchBtn">Камера</button>
-        <button id="startBtn">Стать частью кода</button>
+        <button onclick="toggleCamera()">Камера</button>
+        <button onclick="toggleMatrix()">Стать частью кода</button>
     </div>
 
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+        const errorLog = document.getElementById('errorLog');
         const video = document.createElement('video');
-        video.setAttribute('playsinline', ''); // Важно для iPhone/Android
         
         let isMatrix = false;
         let useFront = true;
-        const fontSize = 10;
-        const chars = "0123456789ABCDEFHIJKLMNOPQRSTUVWXYZ";
+        const fontSize = 11;
+        const chars = "0123456789QWERTYUIOPASDFGHJKLZXCVBNM";
 
-        async function start() {
+        function log(msg) { errorLog.innerText += msg + "\n"; }
+
+        async function initCamera() {
             try {
+                log("Запрос камеры...");
                 if (video.srcObject) {
-                    video.srcObject.getTracks().forEach(track => track.stop());
+                    video.srcObject.getTracks().forEach(t => t.stop());
                 }
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: useFront ? "user" : "environment" }
                 });
+                video.muted = true;
+                video.setAttribute('playsinline', 'true');
                 video.srcObject = stream;
                 video.play();
+                log("Камера запущена успешно.");
             } catch (e) {
-                alert("Ошибка: Проверь, не открыта ли камера в другом приложении");
+                log("ОШИБКА: " + e.name + " - " + e.message);
             }
         }
 
-        document.getElementById('switchBtn').onclick = () => { useFront = !useFront; start(); };
-        document.getElementById('startBtn').onclick = () => { isMatrix = !isMatrix; };
+        function toggleCamera() { useFront = !useFront; initCamera(); }
+        function toggleMatrix() { isMatrix = !isMatrix; }
 
-        function render() {
+        function draw() {
             const w = canvas.width = window.innerWidth;
             const h = canvas.height = window.innerHeight;
 
-            if (video.readyState === 4) {
+            if (video.readyState >= 2) {
                 if (isMatrix) {
                     ctx.fillStyle = "black";
                     ctx.fillRect(0, 0, w, h);
@@ -59,21 +67,23 @@
                     const cols = Math.floor(w / fontSize);
                     const rows = Math.floor(h / fontSize);
                     
-                    const temp = document.createElement('canvas');
-                    temp.width = cols; temp.height = rows;
-                    const tCtx = temp.getContext('2d');
+                    const offscreen = document.createElement('canvas');
+                    offscreen.width = cols; offscreen.height = rows;
+                    const oCtx = offscreen.getContext('2d');
                     
-                    if (useFront) { tCtx.translate(cols, 0); tCtx.scale(-1, 1); }
-                    tCtx.drawImage(video, 0, 0, cols, rows);
-                    const data = tCtx.getImageData(0, 0, cols, rows).data;
-
+                    if (useFront) { oCtx.translate(cols, 0); oCtx.scale(-1, 1); }
+                    oCtx.drawImage(video, 0, 0, cols, rows);
+                    
+                    const pixels = oCtx.getImageData(0, 0, cols, rows).data;
                     ctx.font = fontSize + "px monospace";
+
                     for (let y = 0; y < rows; y++) {
                         for (let x = 0; x < cols; x++) {
                             const i = (y * cols + x) * 4;
-                            const bright = (data[i] + data[i+1] + data[i+2]) / 3;
-                            if (bright > 45) {
-                                ctx.fillStyle = rgb(0, ${bright}, 0);
+                            const brightness = (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
+                            
+                            if (brightness > 50) {
+                                ctx.fillStyle = rgb(0, ${brightness}, 0);
                                 ctx.fillText(chars[Math.floor(Math.random()*chars.length)], x*fontSize, y*fontSize);
                             }
                         }
@@ -85,11 +95,13 @@
                     ctx.restore();
                 }
             }
-            requestAnimationFrame(render);
+            requestAnimationFrame(draw);
         }
 
-        start();
-        render();
+        window.onload = () => {
+            initCamera();
+            draw();
+        };
     </script>
 </body>
 </html>
