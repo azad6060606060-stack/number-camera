@@ -3,45 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Matrix Camera FIX</title>
+    <title>Matrix Final Fix</title>
     <style>
         body {
             margin: 0;
             background-color: #000;
             color: #0f0;
             font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            overflow: hidden;
         }
         #ascii-layer {
-            font-size: 8px;
+            font-size: 9px;
             line-height: 7px;
             white-space: pre;
             text-align: center;
-            width: 100%;
-            height: 100%;
-            display: block;
+            width: 100vw;
+            height: 100vh;
             text-shadow: 0 0 5px #0f0;
+            display: none;
         }
-        #btn {
+        #controls {
             position: absolute;
             z-index: 100;
-            padding: 20px;
+        }
+        button {
+            padding: 20px 40px;
             background: #0f0;
             color: #000;
             border: none;
+            font-size: 20px;
             font-weight: bold;
-            border-radius: 10px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+        #error-log {
+            color: red;
+            font-size: 14px;
+            margin-top: 10px;
+            text-align: center;
         }
         video, canvas { position: absolute; visibility: hidden; pointer-events: none; }
     </style>
 </head>
 <body>
 
-    <button id="btn" onclick="start()">ЗАПУСТИТЬ МАТРИЦУ</button>
+    <div id="controls">
+        <button onclick="init()">ВКЛЮЧИТЬ МАТРИЦУ</button>
+        <div id="error-log"></div>
+    </div>
+    
     <pre id="ascii-layer"></pre>
 
     <video id="video" autoplay playsinline muted></video>
@@ -52,53 +67,66 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         const layer = document.getElementById('ascii-layer');
-        const chars = ["#", "8", "0", "1", "7", "+", ":", "-", ".", " "];
+        const errorLog = document.getElementById('error-log');
 
-        async function start() {
-            document.getElementById('btn').style.display = 'none';
+        // Набор цифр для эффекта
+        const chars = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", " "];
+
+        async function init() {
+            errorLog.innerText = "Запуск камеры...";
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
+                const constraints = { 
                     video: { facingMode: "environment" }, 
                     audio: false 
-                });
+                };
+                
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 
-                // Ждем, пока видео реально начнет отдавать кадры
-                video.onloadedmetadata = () => {
-                    video.play();
-                    render();
-                };
+                // Для iOS важно вызвать play() явно после клика
+                await video.play();
+                
+                document.getElementById('controls').style.display = 'none';
+                layer.style.display = 'block';
+                
+                render();
             } catch (err) {
-                alert("Нет доступа к камере!");
+                errorLog.innerText = "Ошибка: " + err.name + " - " + err.message;
+                console.error(err);
             }
         }
 
         function render() {
-            // Если видео не готово, ждем
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                const w = 80; 
-                const h = Math.floor(w * (video.videoHeight / video.videoWidth) * 0.5);
-                
+            if (video.paused || video.ended) return;
+
+            // Ширина кадра в символах
+            const w = 100; 
+            const h = Math.floor(w * (video.videoHeight / video.videoWidth) * 0.55);
+            
+            if (w > 0 && h > 0) {
                 canvas.width = w;
                 canvas.height = h;
                 ctx.drawImage(video, 0, 0, w, h);
 
                 const data = ctx.getImageData(0, 0, w, h).data;
-                let res = "";
+                let ascii = "";
 
                 for (let y = 0; y < h; y++) {
                     for (let x = 0; x < w; x++) {
                         const i = (y * w + x) * 4;
-                        // Считаем яркость
-                        const bright = (data[i] + data[i+1] + data[i+2]) / 3;
-                        // Чем ярче, тем "гуще" символ (инвертируем для черного фона)
-                        const charIdx = Math.floor((bright / 255) * (chars.length - 1));
-                        res += chars[charIdx];
+                        // Яркость: (R+G+B)/3
+                        const brightness = (data[i] + data[i+1] + data[i+2]) / 3;
+                        
+                        // Выбираем цифру: чем светлее, тем "плотнее" символ
+                        // Инверсия: (1 - brightness/255) если хочешь наоборот
+                        const charIdx = Math.floor((brightness / 255) * (chars.length - 1));
+                        ascii += chars[charIdx];
                     }
-                    res += "\n";
+                    ascii += "\n";
                 }
-                layer.textContent = res;
+                layer.textContent = ascii;
             }
+            
             requestAnimationFrame(render);
         }
     </script>
