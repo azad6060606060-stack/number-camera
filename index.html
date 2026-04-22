@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Matrix Vision</title>
+  <title>Digital Matrix Camera</title>
   <style>
     body { margin:0; background:black; overflow:hidden; }
     canvas { display:block; }
@@ -20,8 +20,8 @@
 </head>
 <body>
 
-<button onclick="startSystem()">Старт</button>
-<button onclick="switchCamera()" style="left:120px;">Камера</button>
+<button onclick="start()">Старт</button>
+<button onclick="switchCam()" style="left:100px;">Камера</button>
 
 <video id="video" autoplay playsinline style="display:none;"></video>
 <canvas id="canvas"></canvas>
@@ -31,14 +31,17 @@ let stream = null;
 let useFront = true;
 let started = false;
 
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
 // 🚀 запуск
-async function startSystem() {
+async function start() {
   if (started) return;
   started = true;
 
   await startCamera();
-  runEffect();
-  startMatrixRain();
+  renderDigits();
 }
 
 // 📷 камера
@@ -51,21 +54,19 @@ async function startCamera() {
     video: { facingMode: useFront ? "user" : "environment" }
   });
 
-  document.getElementById("video").srcObject = stream;
+  video.srcObject = stream;
 }
 
 // 🔁 камера
-function switchCamera() {
+function switchCam() {
   useFront = !useFront;
   if (started) startCamera();
 }
 
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
+// 🔢 ОСНОВНАЯ ЛОГИКА — ВСЁ В ЦИФРАХ
+function renderDigits() {
 
-// 🧠 эффект силуэта
-function runEffect() {
-  const video = document.getElementById("video");
+  const cellSize = 10; // размер "пикселя-цифры"
 
   function loop() {
     if (video.videoWidth === 0) {
@@ -78,71 +79,41 @@ function runEffect() {
 
     ctx.drawImage(video, 0, 0);
 
-    let frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    let data = frame.data;
+    const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = frame.data;
 
-    for (let i = 0; i < data.length; i += 4) {
-      let brightness = (data[i] + data[i+1] + data[i+2]) / 3;
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      if (brightness > 100) {
-        data[i] = 0;
-        data[i+1] = 255;
-        data[i+2] = 0;
-      } else {
-        data[i] = 0;
-        data[i+1] = 0;
-        data[i+2] = 0;
+    ctx.font = cellSize + "px monospace";
+
+    for (let y = 0; y < canvas.height; y += cellSize) {
+      for (let x = 0; x < canvas.width; x += cellSize) {
+
+        const i = (y * canvas.width + x) * 4;
+
+        let r = data[i];
+        let g = data[i+1];
+        let b = data[i+2];
+
+        let brightness = (r + g + b) / 3;
+
+        // 🔢 выбираем цифру
+        let digit = Math.floor(Math.random() * 10);
+
+        // 🟢 цвет зависит от яркости
+        let green = Math.floor(brightness);
+
+        ctx.fillStyle = rgb(0, ${green}, 0);
+
+        ctx.fillText(digit, x, y);
       }
     }
-
-    ctx.putImageData(frame, 0, 0);
 
     requestAnimationFrame(loop);
   }
 
   loop();
-}
-
-// 🔢 MATRIX ЦИФЕРКИ
-let columns = [];
-let fontSize = 14;
-
-function startMatrixRain() {
-  const width = window.innerWidth;
-  const height = window.innerHeight;
-
-  canvas.width = width;
-  canvas.height = height;
-
-  const cols = Math.floor(width / fontSize);
-
-  for (let i = 0; i < cols; i++) {
-    columns[i] = Math.random() * height;
-  }
-
-  function rain() {
-    ctx.fillStyle = "rgba(0,0,0,0.05)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillStyle = "#0f0";
-    ctx.font = fontSize + "px monospace";
-
-    for (let i = 0; i < columns.length; i++) {
-      const text = Math.random() > 0.5 ? "0" : "1";
-
-      ctx.fillText(text, i * fontSize, columns[i]);
-
-      if (columns[i] > canvas.height && Math.random() > 0.975) {
-        columns[i] = 0;
-      }
-
-      columns[i] += fontSize;
-    }
-
-    requestAnimationFrame(rain);
-  }
-
-  rain();
 }
 </script>
 
