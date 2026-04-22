@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matrix Human Code</title>
+    <title>Matrix Face</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: black; display: flex; flex-direction: column; align-items: center; }
+        body { margin: 0; overflow: hidden; background: #000; display: flex; flex-direction: column; align-items: center; }
         canvas { display: block; }
-        .controls { position: absolute; bottom: 20px; display: flex; gap: 10px; z-index: 10; }
-        button { padding: 12px 20px; font-size: 14px; background: rgba(0, 255, 70, 0.1); color: #00ff46; border: 2px solid #00ff46; border-radius: 5px; cursor: pointer; font-family: monospace; }
+        .controls { position: absolute; bottom: 20px; display: flex; gap: 10px; }
+        button { padding: 12px; background: none; color: #0f0; border: 1px solid #0f0; cursor: pointer; font-family: monospace; }
     </style>
 </head>
 <body>
@@ -20,93 +20,76 @@
 
     <script>
         const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d', { alpha: false });
+        const ctx = canvas.getContext('2d');
         const video = document.createElement('video');
-        const switchBtn = document.getElementById('switchBtn');
-        const startBtn = document.getElementById('startBtn');
+        video.setAttribute('playsinline', ''); // Важно для iPhone/Android
+        
+        let isMatrix = false;
+        let useFront = true;
+        const fontSize = 10;
+        const chars = "0123456789ABCDEFHIJKLMNOPQRSTUVWXYZ";
 
-        let width, height;
-        const fontSize = 10; // Размер символа кода
-        let columns, rows;
-        const chars = "0123456789ABCDEFHIJKLMNOPQRSTUVWXYZ$+-*/=%";
-        let useFrontCamera = true;
-        let isMatrixActive = false;
-
-        function resize() {
-            width = canvas.width = window.innerWidth;
-            height = canvas.height = window.innerHeight;
-            columns = Math.floor(width / fontSize);
-            rows = Math.floor(height / fontSize);
-        }
-
-        window.addEventListener('resize', resize);
-        resize();
-
-        async function initCamera() {
-            if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
-            const constraints = { video: { facingMode: useFrontCamera ? "user" : "environment" } };
+        async function start() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: useFront ? "user" : "environment" }
+                });
                 video.srcObject = stream;
                 video.play();
-            } catch (err) { alert("Ошибка камеры"); }
+            } catch (e) {
+                alert("Ошибка: Проверь, не открыта ли камера в другом приложении");
+            }
         }
 
-        switchBtn.onclick = () => { useFrontCamera = !useFrontCamera; initCamera(); };
-        startBtn.onclick = () => { isMatrixActive = !isMatrixActive; };
+        document.getElementById('switchBtn').onclick = () => { useFront = !useFront; start(); };
+        document.getElementById('startBtn').onclick = () => { isMatrix = !isMatrix; };
 
-        function draw() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                if (isMatrixActive) {
-                    // Эффект "Стать частью кода"
+        function render() {
+            const w = canvas.width = window.innerWidth;
+            const h = canvas.height = window.innerHeight;
+
+            if (video.readyState === 4) {
+                if (isMatrix) {
                     ctx.fillStyle = "black";
-                    ctx.fillRect(0, 0, width, height);
-
-                    const tempCanvas = document.createElement('canvas');
-                    tempCanvas.width = columns;
-                    tempCanvas.height = rows;
-                    const tCtx = tempCanvas.getContext('2d');
+                    ctx.fillRect(0, 0, w, h);
                     
-                    // Зеркалим изображение для фронталки
-                    if(useFrontCamera) {
-                        tCtx.translate(columns, 0);
-                        tCtx.scale(-1, 1);
-                    }
-                    tCtx.drawImage(video, 0, 0, columns, rows);
+                    const cols = Math.floor(w / fontSize);
+                    const rows = Math.floor(h / fontSize);
                     
-                    const pixels = tCtx.getImageData(0, 0, columns, rows).data;
+                    const temp = document.createElement('canvas');
+                    temp.width = cols; temp.height = rows;
+                    const tCtx = temp.getContext('2d');
+                    
+                    if (useFront) { tCtx.translate(cols, 0); tCtx.scale(-1, 1); }
+                    tCtx.drawImage(video, 0, 0, cols, rows);
+                    const data = tCtx.getImageData(0, 0, cols, rows).data;
 
                     ctx.font = fontSize + "px monospace";
                     for (let y = 0; y < rows; y++) {
-                        for (let x = 0; x < columns; x++) {
-                            const i = (y * columns + x) * 4;
-                            const brightness = (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
-                            
-                            if (brightness > 40) {
-                                // Если пиксель светлый, рисуем символ
-                                const char = chars[Math.floor(Math.random() * chars.length)];
-                                // Чем ярче точка, тем ярче зеленый цвет
-                                ctx.fillStyle = rgb(0, ${brightness}, 0);
-                                ctx.fillText(char, x * fontSize, y * fontSize);
+                        for (let x = 0; x < cols; x++) {
+                            const i = (y * cols + x) * 4;
+                            const bright = (data[i] + data[i+1] + data[i+2]) / 3;
+                            if (bright > 45) {
+                                ctx.fillStyle = rgb(0, ${bright}, 0);
+                                ctx.fillText(chars[Math.floor(Math.random()*chars.length)], x*fontSize, y*fontSize);
                             }
                         }
                     }
                 } else {
-                    // Обычное превью камеры
                     ctx.save();
-                    if(useFrontCamera) {
-                        ctx.translate(width, 0);
-                        ctx.scale(-1, 1);
-                    }
-                    ctx.drawImage(video, 0, 0, width, height);
+                    if (useFront) { ctx.translate(w, 0); ctx.scale(-1, 1); }
+                    ctx.drawImage(video, 0, 0, w, h);
                     ctx.restore();
                 }
             }
-            requestAnimationFrame(draw);
+            requestAnimationFrame(render);
         }
 
-        initCamera();
-        draw();
+        start();
+        render();
     </script>
 </body>
 </html>
