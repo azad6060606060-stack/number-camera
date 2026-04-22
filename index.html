@@ -3,26 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Matrix Camera Fix</title>
+    <title>Matrix Camera FIX</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: monospace; }
         canvas { display: none; width: 100vw; height: 100vh; }
-        
         .ui {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            gap: 20px; z-index: 100; background: rgba(0,0,0,0.9);
+            background: #000; z-index: 100;
         }
-
         button {
             width: 80%; max-width: 300px; padding: 20px;
             background: #000; color: #0f0; border: 2px solid #0f0;
-            font-size: 18px; font-weight: bold; border-radius: 10px;
-            box-shadow: 0 0 15px #0f0;
+            font-size: 18px; font-weight: bold; border-radius: 12px;
+            box-shadow: 0 0 20px #0f0; margin: 10px;
         }
-
-        #status { color: #0f0; text-align: center; font-size: 14px; padding: 10px; }
-        video { position: absolute; width: 1px; height: 1px; opacity: 0; }
+        #switchBtn { position: absolute; bottom: 30px; z-index: 101; display: none; }
+        video { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -31,10 +28,10 @@
     <video id="v" playsinline muted autoplay></video>
 
     <div id="ui" class="ui">
-        <div id="status">Система готова к подключению...</div>
         <button id="startBtn">СТАТЬ ЧАСТЬЮ КОДА</button>
-        <button id="switchBtn" style="display:none;">СМЕНИТЬ КАМЕРУ</button>
     </div>
+    
+    <button id="switchBtn">СМЕНИТЬ КАМЕРУ</button>
 
     <script>
         const v = document.getElementById('v');
@@ -43,101 +40,97 @@
         const ui = document.getElementById('ui');
         const startBtn = document.getElementById('startBtn');
         const switchBtn = document.getElementById('switchBtn');
-        const status = document.getElementById('status');
 
-        let mode = "environment"; 
+        let currentMode = "environment"; 
         let isRunning = false;
-        const fSize = 12;
-        const symbols = "0123456789".split("");
+        const fontSize = 11;
+        const digits = "0123456789".split("");
 
-        async function initCamera() {
-            status.innerText = "Запрос доступа к объективу...";
+        async function startMatrix() {
             try {
+                // Остановка старых треков перед запуском новых
                 if (v.srcObject) {
-                    v.srcObject.getTracks().forEach(t => t.stop());
+                    v.srcObject.getTracks().forEach(track => track.stop());
                 }
 
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: mode }, 
+                const constraints = { 
+                    video: { facingMode: currentMode }, 
                     audio: false 
-                });
-                
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 v.srcObject = stream;
-                
-                // Специфический фикс для iOS
-                v.setAttribute('autoplay', '');
-                v.setAttribute('muted', '');
-                v.setAttribute('playsinline', '');
-                
+
+                // Важно: ждем загрузки и принудительно запускаем play()
                 await v.play();
                 
-                status.innerText = "Соединение установлено.";
-                setTimeout(() => {
-                    ui.style.background = "transparent";
-                    ui.style.justifyContent = "flex-end";
-                    ui.style.paddingBottom = "30px";
-                    startBtn.style.display = "none";
-                    switchBtn.style.display = "block";
-                    c.style.display = "block";
-                }, 500);
+                ui.style.display = 'none';
+                c.style.display = 'block';
+                switchBtn.style.display = 'block';
 
                 if (!isRunning) {
                     isRunning = true;
-                    render();
+                    drawFrame();
                 }
-            } catch (e) {
-                status.style.color = "red";
-                status.innerText = "ОШИБКА: " + e.message + "\nУбедитесь, что сайт открыт через HTTPS.";
+            } catch (err) {
+                alert("Ошибка доступа к камере! Проверьте настройки HTTPS на GitHub.");
+                console.error(err);
             }
         }
 
-        startBtn.onclick = initCamera;
+        startBtn.onclick = startMatrix;
+        
         switchBtn.onclick = () => {
-            mode = (mode === "environment") ? "user" : "environment";
-            initCamera();
+            currentMode = (currentMode === "environment") ? "user" : "environment";
+            startMatrix(); // Перезапуск с новой камерой
         };
 
-        function render() {
+        function drawFrame() {
             if (!isRunning) return;
 
             c.width = window.innerWidth;
             c.height = window.innerHeight;
-            const cols = Math.floor(c.width / fSize);
-            const rows = Math.floor(c.height / fSize);
+            
+            const cols = Math.floor(c.width / fontSize);
+            const rows = Math.floor(c.height / fontSize);
 
             ctx.fillStyle = "black";
             ctx.fillRect(0, 0, c.width, c.height);
 
-            const tmp = document.createElement('canvas');
-            tmp.width = cols; tmp.height = rows;
-            const tCtx = tmp.getContext('2d');
-            tCtx.drawImage(v, 0, 0, cols, rows);
-            const data = tCtx.getImageData(0, 0, cols, rows).data;
+            // Обработка видео через скрытый canvas
+            const tmpC = document.createElement('canvas');
+            tmpC.width = cols;
+            tmpC.height = rows;
+            const tmpCtx = tmpC.getContext('2d');
+            tmpCtx.drawImage(v, 0, 0, cols, rows);
+            
+            const imgData = tmpCtx.getImageData(0, 0, cols, rows).data;
 
-            ctx.font = fSize + "px monospace";
+            ctx.font = fontSize + "px monospace";
             ctx.textAlign = "center";
 
             for (let y = 0; y < rows; y++) {
                 for (let x = 0; x < cols; x++) {
                     const i = (y * cols + x) * 4;
-                    const bright = (data[i] + data[i+1] + data[i+2]) / 3;
+                    const brightness = (imgData[i] + imgData[i+1] + imgData[i+2]) / 3;
+
+                    // Динамическая прозрачность и свечение
+                    const alpha = 0.1 + (brightness / 255) * 0.9;
                     
-                    const alpha = 0.1 + (bright / 255) * 0.9;
-                    
-                    if (bright > 180) {
-                        ctx.fillStyle = rgba(180, 255, 180, ${alpha});
-                        ctx.shadowBlur = 4;
+                    if (brightness > 190) {
+                        ctx.fillStyle = rgba(200, 255, 200, ${alpha});
+                        ctx.shadowBlur = 5;
                         ctx.shadowColor = "#0f0";
                     } else {
                         ctx.fillStyle = rgba(0, 255, 0, ${alpha});
                         ctx.shadowBlur = 0;
                     }
 
-                    const char = symbols[Math.floor(Math.random() * symbols.length)];
-                    ctx.fillText(char, x * fSize + fSize/2, y * fSize + fSize);
+                    const char = digits[Math.floor(Math.random() * digits.length)];
+                    ctx.fillText(char, x * fontSize + fontSize/2, y * fontSize + fontSize);
                 }
             }
-            requestAnimationFrame(render);
+            requestAnimationFrame(drawFrame);
         }
     </script>
 </body>
