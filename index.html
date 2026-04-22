@@ -3,64 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matrix Camera</title>
+    <title>Matrix Human Code</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: black;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        canvas {
-            display: block;
-        }
-        .controls {
-            position: absolute;
-            bottom: 20px;
-            display: flex;
-            gap: 10px;
-            z-index: 10;
-        }
-        button {
-            padding: 12px 20px;
-            font-size: 16px;
-            background: rgba(0, 255, 70, 0.2);
-            color: #00ff46;
-            border: 2px solid #00ff46;
-            border-radius: 5px;
-            cursor: pointer;
-            text-transform: uppercase;
-            font-family: monospace;
-            transition: 0.3s;
-        }
-        button:hover {
-            background: rgba(0, 255, 70, 0.5);
-            box-shadow: 0 0 15px #00ff46;
-        }
+        body { margin: 0; overflow: hidden; background-color: black; display: flex; flex-direction: column; align-items: center; }
+        canvas { display: block; }
+        .controls { position: absolute; bottom: 20px; display: flex; gap: 10px; z-index: 10; }
+        button { padding: 12px 20px; font-size: 14px; background: rgba(0, 255, 70, 0.1); color: #00ff46; border: 2px solid #00ff46; border-radius: 5px; cursor: pointer; font-family: monospace; }
     </style>
 </head>
 <body>
-
     <canvas id="canvas"></canvas>
-
     <div class="controls">
-        <button id="switchBtn">Сменить камеру</button>
+        <button id="switchBtn">Камера</button>
         <button id="startBtn">Стать частью кода</button>
     </div>
 
     <script>
         const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: false });
         const video = document.createElement('video');
         const switchBtn = document.getElementById('switchBtn');
         const startBtn = document.getElementById('startBtn');
 
-        let width, height, columns;
-        const fontSize = 16;
-        const characters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        let drops = [];
+        let width, height;
+        const fontSize = 10; // Размер символа кода
+        let columns, rows;
+        const chars = "0123456789ABCDEFHIJKLMNOPQRSTUVWXYZ$+-*/=%";
         let useFrontCamera = true;
         let isMatrixActive = false;
 
@@ -68,89 +36,71 @@
             width = canvas.width = window.innerWidth;
             height = canvas.height = window.innerHeight;
             columns = Math.floor(width / fontSize);
-            drops = new Array(columns).fill(1);
+            rows = Math.floor(height / fontSize);
         }
 
         window.addEventListener('resize', resize);
         resize();
 
         async function initCamera() {
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
-            }
-            const constraints = {
-                video: { facingMode: useFrontCamera ? "user" : "environment" }
-            };
+            if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+            const constraints = { video: { facingMode: useFrontCamera ? "user" : "environment" } };
             try {
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 video.play();
-            } catch (err) {
-                console.error("Ошибка камеры:", err);
-                alert("Не удалось включить камеру. Проверь разрешения.");
-            }
+            } catch (err) { alert("Ошибка камеры"); }
         }
 
-        switchBtn.onclick = () => {
-            useFrontCamera = !useFrontCamera;
-            initCamera();
-        };
-
-        startBtn.onclick = () => {
-            isMatrixActive = true;
-            startBtn.style.display = 'none'; // Скрываем кнопку после активации
-        };
+        switchBtn.onclick = () => { useFrontCamera = !useFrontCamera; initCamera(); };
+        startBtn.onclick = () => { isMatrixActive = !isMatrixActive; };
 
         function draw() {
-            ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
-            ctx.fillRect(0, 0, width, height);
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                if (isMatrixActive) {
+                    // Эффект "Стать частью кода"
+                    ctx.fillStyle = "black";
+                    ctx.fillRect(0, 0, width, height);
 
-            if (isMatrixActive && video.readyState === video.HAVE_ENOUGH_DATA) {
-                // Рисуем видео в скрытом режиме, чтобы брать пиксели
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = columns;
-                tempCanvas.height = Math.floor(height / fontSize);
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
-                const pixelData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height).data;
-
-                ctx.font = fontSize + "px monospace";
-
-                for (let i = 0; i < drops.length; i++) {
-                    const char = characters[Math.floor(Math.random() * characters.length)];
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = columns;
+                    tempCanvas.height = rows;
+                    const tCtx = tempCanvas.getContext('2d');
                     
-                    // Берем яркость пикселя из видео
-                    const pixelIndex = (Math.floor(drops[i]) * columns + i) * 4;
-                    const r = pixelData[pixelIndex];
-                    const g = pixelData[pixelIndex + 1];
-                    const b = pixelData[pixelIndex + 2];
-                    const brightness = (r + g + b) / 3;
-
-                    // Если место яркое (лицо), рисуем символ ярко-зеленым
-                    if (brightness > 50) {
-                        ctx.fillStyle = "#0f0";
-                    } else {
-                        ctx.fillStyle = "#003300"; // Темный фон
+                    // Зеркалим изображение для фронталки
+                    if(useFrontCamera) {
+                        tCtx.translate(columns, 0);
+                        tCtx.scale(-1, 1);
                     }
+                    tCtx.drawImage(video, 0, 0, columns, rows);
+                    
+                    const pixels = tCtx.getImageData(0, 0, columns, rows).data;
 
-                    ctx.fillText(char, i * fontSize, drops[i] * fontSize);
-
-                    if (drops[i] * fontSize > height && Math.random() > 0.975) {
-                        drops[i] = 0;
+                    ctx.font = fontSize + "px monospace";
+                    for (let y = 0; y < rows; y++) {
+                        for (let x = 0; x < columns; x++) {
+                            const i = (y * columns + x) * 4;
+                            const brightness = (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
+                            
+                            if (brightness > 40) {
+                                // Если пиксель светлый, рисуем символ
+                                const char = chars[Math.floor(Math.random() * chars.length)];
+                                // Чем ярче точка, тем ярче зеленый цвет
+                                ctx.fillStyle = rgb(0, ${brightness}, 0);
+                                ctx.fillText(char, x * fontSize, y * fontSize);
+                            }
+                        }
                     }
-                    drops[i]++;
+                } else {
+                    // Обычное превью камеры
+                    ctx.save();
+                    if(useFrontCamera) {
+                        ctx.translate(width, 0);
+                        ctx.scale(-1, 1);
+                    }
+                    ctx.drawImage(video, 0, 0, width, height);
+                    ctx.restore();
                 }
-            } else {
-                // Пока не нажата кнопка, просто показываем видео (зеркально)
-                ctx.save();
-                ctx.translate(width, 0);
-                ctx.scale(-1, 1);
-                ctx.drawImage(video, 0, 0, width, height);
-                ctx.restore();
-                
-                ctx.fillStyle = "#0f0";
-                ctx.font = "20px monospace";
-                ctx.fillText("КАМЕРА ГОТОВА. НАЖМИ КНОПКУ.", width/2 - 150, height/2);
             }
             requestAnimationFrame(draw);
         }
