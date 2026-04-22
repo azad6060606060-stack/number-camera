@@ -1,77 +1,164 @@
 <!DOCTYPE html>
-import cv2
-import numpy as np
-from IPython.display import display, Javascript
-from google.colab.output import eval_js
-from base64 import b64decode
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Matrix GitHub Edition</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+        }
 
-# 1. Функция JavaScript для запуска камеры в браузере
-def take_photo(filename='photo.jpg', quality=0.8):
-  js = Javascript('''
-    async function takePhoto(quality) {
-      const div = document.createElement('div');
-      const video = document.createElement('video');
-      video.style.display = 'block';
-      const stream = await navigator.mediaDevices.getUserMedia({video: true});
+        /* Кнопки интерфейса */
+        .ui-panel {
+            position: absolute;
+            bottom: 30px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            z-index: 100;
+        }
 
-      document.body.appendChild(div);
-      div.appendChild(video);
-      video.srcObject = stream;
-      await video.play();
+        button {
+            background: rgba(0, 0, 0, 0.8);
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 15px 25px;
+            border-radius: 5px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+            width: 80%;
+            max-width: 300px;
+        }
 
-      // Ждем клика, чтобы сделать кадр
-      await new Promise((resolve) => {
-        const btn = document.createElement('button');
-        btn.textContent = 'Распознать цифры';
-        div.appendChild(btn);
-        btn.onclick = resolve;
-      });
+        button:active {
+            background: #0f0;
+            color: #000;
+        }
 
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext('2d').drawImage(video, 0, 0);
-      stream.getVideoTracks()[0].stop();
-      div.remove();
-      return canvas.toDataURL('image/jpeg', quality);
-    }
-    ''')
-  display(js)
-  data = eval_js('takePhoto({})'.format(quality))
-  binary = b64decode(data.split(',')[1])
-  with open(filename, 'wb') as f:
-    f.write(binary)
-  return filename
+        #matrix-canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
 
-# 2. Основной цикл программы
-try:
-  print("Камера запускается...")
-  filename = take_photo()
-  
-  # Загружаем фото в OpenCV
-  img = cv2.imread(filename)
-  gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-  
-  # Применяем порог (threshold), чтобы оставить только четкие линии (как цифры)
-  # Это создаст эффект "матрицы" или сканера цифр
-  thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                 cv2.THRESH_BINARY_INV, 11, 2)
+        video { position: absolute; visibility: hidden; pointer-events: none; }
+    </style>
+</head>
+<body>
 
-  # Ищем контуры, которые похожи на символы
-  contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-  
-  for cnt in contours:
-      x, y, w, h = cv2.boundingRect(cnt)
-      # Если объект похож по размеру на цифру, рисуем рамку
-      if h > 10 and w > 5:
-          cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
-          cv2.putText(img, "NUM", (x, y-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+    <canvas id="matrix-canvas"></canvas>
+    <video id="video" autoplay playsinline muted></video>
 
-  # Сохраняем и показываем результат
-  cv2.imwrite('result.jpg', img)
-  from google.colab.patches import cv2_imshow
-  print("Результат обработки:")
-  cv2_imshow(img)
+    <div class="ui-panel">
+        <button id="switchBtn" onclick="switchCamera()">Сменить камеру</button>
+        <button id="startBtn" onclick="toggleMatrix()">Стать частью кода</button>
+    </div>
 
-except Exception as err:
-  print(str(err))
+    <script>
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const video = document.getElementById('video');
+        
+        let currentFacingMode = "environment"; // По умолчанию задняя
+        let animating = false;
+        const fontSize = 12;
+        const chars = "0123456789".split("");
+
+        // Функция запуска и остановки (Стать частью кода)
+        async function toggleMatrix() {
+            if (animating) {
+                location.reload(); // Сброс
+                return;
+            }
+            
+            document.getElementById('startBtn').innerText = "Выйти из кода";
+            await startCamera();
+            animating = true;
+            render();
+        }
+
+        // Функция смены камеры
+        async function switchCamera() {
+            currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+            if (animating) {
+                await startCamera();
+            }
+        }
+
+        async function startCamera() {
+            try {
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: currentFacingMode },
+                    audio: false 
+                });
+                video.srcObject = stream;
+                await video.play();
+            } catch (err) {
+                alert("Ошибка камеры: " + err.message);
+            }
+        }
+
+        function render() {
+            if (!animating) return;
+
+            // Адаптируем холст под экран
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const cols = Math.floor(canvas.width / fontSize);
+            const rows = Math.floor(canvas.height / fontSize);
+
+            // Чёрный фон
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Вспомогательный анализ яркости
+            const offC = document.createElement('canvas');
+            const offCtx = offC.getContext('2d');
+            offC.width = cols;
+            offC.height = rows;
+            offCtx.drawImage(video, 0, 0, cols, rows);
+            const imgData = offCtx.getImageData(0, 0, cols, rows).data;
+
+            ctx.font = fontSize + "px monospace";
+            ctx.textAlign = "center";
+
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const i = (y * cols + x) * 4;
+                    const brightness = (imgData[i] + imgData[i+1] + imgData[i+2]) / 3;
+
+                    // Твой алгоритм освещения:
+                    const alpha = 0.1 + (brightness / 255) * 0.9;
+                    
+                    if (brightness > 200) {
+                        ctx.fillStyle = rgba(200, 255, 200, ${alpha});
+                        ctx.shadowBlur = 5;
+                        ctx.shadowColor = "#0f0";
+                    } else {
+                        ctx.fillStyle = rgba(0, 255, 0, ${alpha});
+                        ctx.shadowBlur = 0;
+                    }
+
+                    const char = chars[Math.floor(Math.random() * chars.length)];
+                    ctx.fillText(char, x * fontSize, y * fontSize);
+                }
+            }
+            requestAnimationFrame(render);
+        }
+    </script>
+</body>
+</html>
