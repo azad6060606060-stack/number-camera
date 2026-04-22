@@ -2,49 +2,72 @@
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Digital Matrix Camera</title>
+  <title>Stable Matrix Camera</title>
   <style>
-    body { margin:0; background:black; overflow:hidden; }
-    canvas { display:block; }
+    body { margin:0; background:black; color:#0f0; font-family:Arial; text-align:center; }
+    canvas { display:block; margin:auto; }
     button {
-      position:fixed;
-      top:10px;
-      left:10px;
-      z-index:10;
-      padding:10px;
+      margin:10px;
+      padding:12px;
       background:#0f0;
       border:none;
       border-radius:8px;
+      color:black;
+      font-weight:bold;
+    }
+    #status {
+      position:fixed;
+      bottom:10px;
+      left:10px;
+      font-size:14px;
+      color:#0f0;
     }
   </style>
 </head>
 <body>
 
-<button onclick="start()">Старт</button>
-<button onclick="switchCam()" style="left:100px;">Камера</button>
+<h3>🧠 Stable Matrix System</h3>
 
-<video id="video" autoplay playsinline style="display:none;"></video>
+<button onclick="startSystem()">Старт камеры</button>
+<button onclick="switchCamera()">Сменить камеру</button>
+
 <canvas id="canvas"></canvas>
+<div id="status">⛔ Не запущено</div>
 
 <script>
 let stream = null;
 let useFront = true;
 let started = false;
 
-const video = document.getElementById("video");
+const video = document.createElement("video");
+video.autoplay = true;
+video.playsInline = true;
+
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-// 🚀 запуск
-async function start() {
+const statusEl = document.getElementById("status");
+
+// 🚀 СТАРТ СИСТЕМЫ
+async function startSystem() {
   if (started) return;
   started = true;
 
-  await startCamera();
-  renderDigits();
+  status("📷 Запуск камеры...");
+
+  const ok = await startCamera();
+
+  if (!ok) {
+    status("❌ Камера не запустилась");
+    return;
+  }
+
+  status("🧠 Система работает");
+
+  runMatrix();
 }
 
-// 📷 камера
+// 📷 камера (СТАБИЛЬНАЯ ВЕРСИЯ)
 async function startCamera() {
   try {
     if (stream) {
@@ -60,26 +83,30 @@ async function startCamera() {
 
     video.srcObject = stream;
 
-    await video.play(); // 🔥 важно — принудительный запуск
+    await video.play();
+
+    return true;
 
   } catch (e) {
-    alert("Камера не запустилась: " + e.message);
     console.log(e);
+    return false;
   }
 }
-// 🔁 камера
-function switchCam() {
+
+// 🔁 смена камеры
+function switchCamera() {
   useFront = !useFront;
   if (started) startCamera();
 }
 
-// 🔢 ОСНОВНАЯ ЛОГИКА — ВСЁ В ЦИФРАХ
-function renderDigits() {
+// 🧠 MATRIX РЕЖИМ (цифры)
+function runMatrix() {
 
-  const cellSize = 10; // размер "пикселя-цифры"
+  const cell = 10;
 
   function loop() {
-    if (video.videoWidth === 0) {
+
+    if (!video.videoWidth) {
       requestAnimationFrame(loop);
       return;
     }
@@ -95,10 +122,10 @@ function renderDigits() {
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.font = cellSize + "px monospace";
+    ctx.font = cell + "px monospace";
 
-    for (let y = 0; y < canvas.height; y += cellSize) {
-      for (let x = 0; x < canvas.width; x += cellSize) {
+    for (let y = 0; y < canvas.height; y += cell) {
+      for (let x = 0; x < canvas.width; x += cell) {
 
         const i = (y * canvas.width + x) * 4;
 
@@ -108,14 +135,11 @@ function renderDigits() {
 
         let brightness = (r + g + b) / 3;
 
-        // 🔢 выбираем цифру
         let digit = Math.floor(Math.random() * 10);
 
-        // 🟢 цвет зависит от яркости
-        let green = Math.floor(brightness);
+        let green = Math.max(30, Math.min(255, brightness));
 
         ctx.fillStyle = rgb(0, ${green}, 0);
-
         ctx.fillText(digit, x, y);
       }
     }
@@ -124,6 +148,11 @@ function renderDigits() {
   }
 
   loop();
+}
+
+// 📊 статус
+function status(text) {
+  statusEl.innerText = text;
 }
 </script>
 
