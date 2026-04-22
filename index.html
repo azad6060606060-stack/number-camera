@@ -2,170 +2,93 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Matrix Real Lighting</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MATRIX LIVE CAMERA</title>
     <style>
-        body {
-            margin: 0;
-            background-color: #000; /* Чёрный фон */
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+        body { margin: 0; background: #000; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+        canvas { width: 100vw; height: 100vh; display: block; }
+        #startBtn {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            padding: 20px 40px; background: #000; color: #0f0; border: 2px solid #0f0;
+            font-family: monospace; font-size: 20px; cursor: pointer; z-index: 10;
+            box-shadow: 0 0 20px #0f0;
         }
-        /* Холст, на котором рисуем цифры */
-        #matrix-canvas {
-            width: 100vw;
-            height: 100vh;
-            display: none; /* Скрыт до запуска */
-        }
-        #controls {
-            position: absolute;
-            z-index: 100;
-            text-align: center;
-        }
-        button {
-            padding: 20px 40px;
-            background: #000;
-            color: #0f0;
-            border: 2px solid #0f0;
-            font-size: 20px;
-            font-weight: bold;
-            border-radius: 12px;
-            cursor: pointer;
-            text-transform: uppercase;
-            box-shadow: 0 0 15px rgba(0, 255, 0, 0.7);
-        }
-        #error-log { color: red; margin-top: 10px; font-family: monospace; }
-        /* Скрытые элементы */
-        video { position: absolute; visibility: hidden; pointer-events: none; }
+        video { position: absolute; visibility: hidden; }
     </style>
 </head>
 <body>
 
-    <div id="controls">
-        <button onclick="init()">Войти в Матрицу</button>
-        <div id="error-log"></div>
-    </div>
-    
-    <canvas id="matrix-canvas"></canvas>
-
-    <video id="video" autoplay playsinline muted></video>
-    <canvas id="helper-canvas" style="display:none;"></canvas>
+    <button id="startBtn">ПОДКЛЮЧИТЬ КАМЕРУ</button>
+    <canvas id="c"></canvas>
+    <video id="v" autoplay playsinline muted></video>
 
     <script>
-        const video = document.getElementById('video');
-        const matrixCanvas = document.getElementById('matrix-canvas');
-        const mCtx = matrixCanvas.getContext('2d');
+        const btn = document.getElementById('startBtn');
+        const v = document.getElementById('v');
+        const c = document.getElementById('c');
+        const ctx = c.getContext('2d', { willReadFrequently: true });
         
-        const helperCanvas = document.getElementById('helper-canvas');
-        const hCtx = helperCanvas.getContext('2d', { willReadFrequently: true });
-        
-        const errorLog = document.getElementById('error-log');
+        const fontSize = 12;
+        const symbols = "0123456789".split("");
 
-        // Настройки символов
-        const fontSize = 14; // Размер шрифта цифр
-        const chars = "0123456789".split(""); // Только цифры
-        let columns, rows;
-        let rain = []; // Массив для позиций капель (необязательно, но для структуры)
-
-        // Инициализация
-        async function init() {
-            errorLog.innerText = "Подключение...";
+        btn.onclick = async () => {
+            btn.style.display = 'none';
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" }, // Задняя камера
+                    video: { facingMode: "environment" }, 
                     audio: false 
                 });
-                video.srcObject = stream;
-                await video.play(); // Критично для iOS
-                
-                document.getElementById('controls').style.display = 'none';
-                matrixCanvas.style.display = 'block';
-                
-                setupGrid();
-                window.addEventListener('resize', setupGrid); // Перестраиваем при смене ориентации
-                
+                v.srcObject = stream;
+                await v.play();
                 render();
-            } catch (err) {
-                errorLog.innerText = "Ошибка: " + err.name;
-                console.error(err);
+            } catch (e) {
+                alert("Ошибка камеры: " + e);
             }
-        }
+        };
 
-        // Настройка сетки символов
-        function setupGrid() {
-            matrixCanvas.width = window.innerWidth;
-            matrixCanvas.height = window.innerHeight;
-            
-            columns = Math.floor(matrixCanvas.width / fontSize);
-            rows = Math.floor(matrixCanvas.height / fontSize);
-            
-            mCtx.font = fontSize + "px monospace";
-            mCtx.textAlign = "center";
-        }
-
-        // Основной цикл отрисовки
         function render() {
-            if (video.paused || video.ended) return;
-
-            // 1. Читаем камеру через вспомогательный холст
-            // Делаем его маленьким (низкое разрешение) для быстродействия
-            const hW = 60; 
-            const hH = Math.floor(hW * (video.videoHeight / video.videoWidth));
-            helperCanvas.width = hW;
-            helperCanvas.height = hH;
+            c.width = window.innerWidth;
+            c.height = window.innerHeight;
             
-            hCtx.drawImage(video, 0, 0, hW, hH);
-            const cameraData = hCtx.getImageData(0, 0, hW, hH).data;
+            const cols = Math.floor(c.width / fontSize);
+            const rows = Math.floor(c.height / fontSize);
 
-            // 2. Очищаем основной холст чёрным цветом
-            mCtx.fillStyle = "black";
-            mCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+            // Рисуем чёрный фон
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, c.width, c.height);
 
-            // 3. Рисуем сетку цифр
-            for (let c = 0; c < columns; c++) {
-                for (let r = 0; r < rows; r++) {
+            // Создаем временный холст в памяти для анализа яркости кадра
+            const tempC = document.createElement('canvas');
+            const tempCtx = tempC.getContext('2d');
+            tempC.width = cols;
+            tempC.height = rows;
+            tempCtx.drawImage(v, 0, 0, cols, rows);
+            const imgData = tempCtx.getImageData(0, 0, cols, rows).data;
+
+            ctx.font = fontSize + "px monospace";
+            ctx.textAlign = "center";
+
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const i = (y * cols + x) * 4;
+                    const brightness = (imgData[i] + imgData[i+1] + imgData[i+2]) / 3;
+
+                    // Динамическая прозрачность: светлые места ярче, темные — почти невидимы
+                    const alpha = 0.05 + (brightness / 255) * 0.95;
                     
-                    // --- МАГИЯ СВЕТА И ТЕНИ ---
-                    
-                    // Сопоставляем текущую колонку/ряд сетки с пикселем на маленьком кадре камеры
-                    const camX = Math.floor((c / columns) * hW);
-                    const camY = Math.floor((r / rows) * hH);
-                    const i = (camY * hW + camX) * 4;
-                    
-                    // Получаем яркость пикселя камеры (0-255)
-                    const brightness = (cameraData[i] + cameraData[i+1] + cameraData[i+2]) / 3;
-                    
-                    // Вычисляем Альфа-канал (прозрачность) на основе яркости.
-                    // Тёмное (0 brightness) -> Альфа 0.1 (едва видно)
-                    // Светлое (255 brightness) -> Альфа 1.0 (полностью ярко)
-                    let alpha = 0.1 + (brightness / 255) * 0.9;
-                    
-                    // Задаем цвет: тёмно-зелёный в базе, но с разной прозрачностью
-                    // Чем ярче пиксель, тем "гуще" зелёный
-                    mCtx.fillStyle = rgba(0, 255, 0, ${alpha});
-                    
-                    // Если очень светло (белый цвет), добавляем белое свечение
-                    if (brightness > 200) {
-                        const whiteAlpha = (brightness - 200) / 55; // 0.0 - 1.0
-                        mCtx.fillStyle = rgba(200, 255, 200, ${alpha}); // Ближе к белому
-                        mCtx.shadowColor = "#fff";
-                        mCtx.shadowBlur = 5;
+                    if (brightness > 180) {
+                        ctx.fillStyle = rgba(180, 255, 180, ${alpha}); // Светло-зеленый (засвет)
+                        ctx.shadowBlur = 5;
+                        ctx.shadowColor = "#0f0";
                     } else {
-                        mCtx.shadowBlur = 0; // В темноте нет свечения
+                        ctx.fillStyle = rgba(0, 255, 0, ${alpha}); // Обычный зеленый
+                        ctx.shadowBlur = 0;
                     }
 
-                    // 4. Выбираем случайную цифру
-                    const text = chars[Math.floor(Math.random() * chars.length)];
-                    
-                    // 5. Рисуем цифру
-                    mCtx.fillText(text, c * fontSize + fontSize/2, r * fontSize + fontSize);
+                    const char = symbols[Math.floor(Math.random() * symbols.length)];
+                    ctx.fillText(char, x * fontSize + fontSize / 2, y * fontSize + fontSize);
                 }
             }
-            
-            // Запускаем следующий кадр
             requestAnimationFrame(render);
         }
     </script>
