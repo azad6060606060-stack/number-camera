@@ -3,54 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Matrix Live GitHub</title>
+    <title>Matrix Camera Fix</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: monospace; }
-        canvas { display: block; width: 100vw; height: 100vh; }
+        canvas { display: none; width: 100vw; height: 100vh; }
         
         .ui {
-            position: absolute; bottom: 40px; left: 0; width: 100%;
-            display: flex; flex-direction: column; align-items: center; gap: 10px;
-            z-index: 100;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 20px; z-index: 100; background: rgba(0,0,0,0.9);
         }
 
         button {
-            width: 85%; max-width: 300px; padding: 18px;
-            background: rgba(0, 20, 0, 0.9); color: #0f0;
-            border: 1px solid #0f0; border-radius: 8px;
-            font-size: 16px; font-weight: bold; text-transform: uppercase;
-            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
-            -webkit-tap-highlight-color: transparent;
+            width: 80%; max-width: 300px; padding: 20px;
+            background: #000; color: #0f0; border: 2px solid #0f0;
+            font-size: 18px; font-weight: bold; border-radius: 10px;
+            box-shadow: 0 0 15px #0f0;
         }
 
-        button:active { background: #0f0; color: #000; }
-        video { position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+        #status { color: #0f0; text-align: center; font-size: 14px; padding: 10px; }
+        video { position: absolute; width: 1px; height: 1px; opacity: 0; }
     </style>
 </head>
 <body>
 
     <canvas id="c"></canvas>
-    <video id="v" autoplay playsinline muted></video>
+    <video id="v" playsinline muted autoplay></video>
 
-    <div class="ui">
-        <button id="camBtn">Сменить камеру</button>
-        <button id="startBtn">Стать частью кода</button>
+    <div id="ui" class="ui">
+        <div id="status">Система готова к подключению...</div>
+        <button id="startBtn">СТАТЬ ЧАСТЬЮ КОДА</button>
+        <button id="switchBtn" style="display:none;">СМЕНИТЬ КАМЕРУ</button>
     </div>
 
     <script>
         const v = document.getElementById('v');
         const c = document.getElementById('c');
         const ctx = c.getContext('2d', { willReadFrequently: true });
+        const ui = document.getElementById('ui');
         const startBtn = document.getElementById('startBtn');
-        const camBtn = document.getElementById('camBtn');
+        const switchBtn = document.getElementById('switchBtn');
+        const status = document.getElementById('status');
 
         let mode = "environment"; 
-        let active = false;
+        let isRunning = false;
         const fSize = 12;
-        const digits = "0123456789".split("");
+        const symbols = "0123456789".split("");
 
-        // Главная функция запуска
-        async function start() {
+        async function initCamera() {
+            status.innerText = "Запрос доступа к объективу...";
             try {
                 if (v.srcObject) {
                     v.srcObject.getTracks().forEach(t => t.stop());
@@ -62,32 +63,42 @@
                 });
                 
                 v.srcObject = stream;
-                // Ждём загрузки видео, чтобы Safari не ругался
-                await new Promise((res) => v.onloadedmetadata = res);
+                
+                // Специфический фикс для iOS
+                v.setAttribute('autoplay', '');
+                v.setAttribute('muted', '');
+                v.setAttribute('playsinline', '');
+                
                 await v.play();
                 
-                if (!active) {
-                    active = true;
+                status.innerText = "Соединение установлено.";
+                setTimeout(() => {
+                    ui.style.background = "transparent";
+                    ui.style.justifyContent = "flex-end";
+                    ui.style.paddingBottom = "30px";
+                    startBtn.style.display = "none";
+                    switchBtn.style.display = "block";
+                    c.style.display = "block";
+                }, 500);
+
+                if (!isRunning) {
+                    isRunning = true;
                     render();
                 }
-                startBtn.innerText = "Выйти из матрицы";
             } catch (e) {
-                alert("Ошибка! Проверь HTTPS или настройки камеры в браузере.");
+                status.style.color = "red";
+                status.innerText = "ОШИБКА: " + e.message + "\nУбедитесь, что сайт открыт через HTTPS.";
             }
         }
 
-        startBtn.onclick = () => {
-            if (active) location.reload();
-            else start();
-        };
-
-        camBtn.onclick = () => {
+        startBtn.onclick = initCamera;
+        switchBtn.onclick = () => {
             mode = (mode === "environment") ? "user" : "environment";
-            if (active) start(); // Перезапуск с новой камерой
+            initCamera();
         };
 
         function render() {
-            if (!active) return;
+            if (!isRunning) return;
 
             c.width = window.innerWidth;
             c.height = window.innerHeight;
@@ -97,12 +108,11 @@
             ctx.fillStyle = "black";
             ctx.fillRect(0, 0, c.width, c.height);
 
-            // Создаем невидимый холст для сканирования пикселей
             const tmp = document.createElement('canvas');
             tmp.width = cols; tmp.height = rows;
             const tCtx = tmp.getContext('2d');
             tCtx.drawImage(v, 0, 0, cols, rows);
-            const pixels = tCtx.getImageData(0, 0, cols, rows).data;
+            const data = tCtx.getImageData(0, 0, cols, rows).data;
 
             ctx.font = fSize + "px monospace";
             ctx.textAlign = "center";
@@ -110,22 +120,21 @@
             for (let y = 0; y < rows; y++) {
                 for (let x = 0; x < cols; x++) {
                     const i = (y * cols + x) * 4;
-                    const bright = (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
+                    const bright = (data[i] + data[i+1] + data[i+2]) / 3;
                     
-                    // Эффект свечения как ты просил
                     const alpha = 0.1 + (bright / 255) * 0.9;
                     
-                    if (bright > 190) {
-                        ctx.fillStyle = rgba(200, 255, 200, ${alpha});
+                    if (bright > 180) {
+                        ctx.fillStyle = rgba(180, 255, 180, ${alpha});
                         ctx.shadowBlur = 4;
-                        ctx.shadowColor = "#fff";
+                        ctx.shadowColor = "#0f0";
                     } else {
                         ctx.fillStyle = rgba(0, 255, 0, ${alpha});
                         ctx.shadowBlur = 0;
                     }
 
-                    const num = digits[Math.floor(Math.random() * digits.length)];
-                    ctx.fillText(num, x * fSize + fSize/2, y * fSize + fSize);
+                    const char = symbols[Math.floor(Math.random() * symbols.length)];
+                    ctx.fillText(char, x * fSize + fSize/2, y * fSize + fSize);
                 }
             }
             requestAnimationFrame(render);
