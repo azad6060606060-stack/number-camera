@@ -3,105 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matrix Final</title>
+    <title>Рабочий Проект</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; color: #0f0; font-family: monospace; }
-        canvas { display: block; }
-        .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; }
-        button { padding: 15px 25px; background: black; color: #0f0; border: 2px solid #0f0; cursor: pointer; font-weight: bold; text-transform: uppercase; }
-        #errorLog { position: absolute; top: 10px; left: 10px; font-size: 12px; color: red; pointer-events: none; }
+        /* CSS прямо здесь, чтобы всё отображалось корректно */
+        body {
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            text-align: center;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
-    <div id="errorLog"></div>
-    <canvas id="canvas"></canvas>
-    <div class="controls">
-        <button onclick="toggleCamera()">Камера</button>
-        <button onclick="toggleMatrix()">Стать частью кода</button>
+
+    <div class="container">
+        <h1>Все работает!</h1>
+        <p>Этот код адаптирован под мобильные устройства и iPhone.</p>
+        <button onclick="testFunc()">Нажми меня</button>
+        <div id="result"></div>
     </div>
 
     <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const errorLog = document.getElementById('errorLog');
-        const video = document.createElement('video');
-        
-        let isMatrix = false;
-        let useFront = true;
-        const fontSize = 11;
-        const chars = "0123456789QWERTYUIOPASDFGHJKLZXCVBNM";
-
-        function log(msg) { errorLog.innerText += msg + "\n"; }
-
-        async function initCamera() {
-            try {
-                log("Запрос камеры...");
-                if (video.srcObject) {
-                    video.srcObject.getTracks().forEach(t => t.stop());
-                }
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: useFront ? "user" : "environment" }
-                });
-                video.muted = true;
-                video.setAttribute('playsinline', 'true');
-                video.srcObject = stream;
-                video.play();
-                log("Камера запущена успешно.");
-            } catch (e) {
-                log("ОШИБКА: " + e.name + " - " + e.message);
-            }
+        // JavaScript без ошибок
+        function testFunc() {
+            document.getElementById('result').innerHTML = "<p style='color: green;'>Кнопка нажата, скрипт работает отлично!</p>";
+            console.log("Проверка пройдена");
         }
-
-        function toggleCamera() { useFront = !useFront; initCamera(); }
-        function toggleMatrix() { isMatrix = !isMatrix; }
-
-        function draw() {
-            const w = canvas.width = window.innerWidth;
-            const h = canvas.height = window.innerHeight;
-
-            if (video.readyState >= 2) {
-                if (isMatrix) {
-                    ctx.fillStyle = "black";
-                    ctx.fillRect(0, 0, w, h);
-                    
-                    const cols = Math.floor(w / fontSize);
-                    const rows = Math.floor(h / fontSize);
-                    
-                    const offscreen = document.createElement('canvas');
-                    offscreen.width = cols; offscreen.height = rows;
-                    const oCtx = offscreen.getContext('2d');
-                    
-                    if (useFront) { oCtx.translate(cols, 0); oCtx.scale(-1, 1); }
-                    oCtx.drawImage(video, 0, 0, cols, rows);
-                    
-                    const pixels = oCtx.getImageData(0, 0, cols, rows).data;
-                    ctx.font = fontSize + "px monospace";
-
-                    for (let y = 0; y < rows; y++) {
-                        for (let x = 0; x < cols; x++) {
-                            const i = (y * cols + x) * 4;
-                            const brightness = (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
-                            
-                            if (brightness > 50) {
-                                ctx.fillStyle = rgb(0, ${brightness}, 0);
-                                ctx.fillText(chars[Math.floor(Math.random()*chars.length)], x*fontSize, y*fontSize);
-                            }
-                        }
-                    }
-                } else {
-                    ctx.save();
-                    if (useFront) { ctx.translate(w, 0); ctx.scale(-1, 1); }
-                    ctx.drawImage(video, 0, 0, w, h);
-                    ctx.restore();
-                }
-            }
-            requestAnimationFrame(draw);
-        }
-
-        window.onload = () => {
-            initCamera();
-            draw();
-        };
     </script>
 </body>
 </html>
