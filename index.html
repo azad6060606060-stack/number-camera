@@ -1,78 +1,47 @@
-<!DOCTYPEhtml>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Number Camera</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: monospace; }
+        canvas { display: block; }
+        #btn { 
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            padding: 15px 25px; background: rgba(0, 255, 0, 0.2); color: #0f0;
+            border: 2px solid #0f0; border-radius: 30px; font-size: 16px; z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <button id="btn" onclick="switchCam()">Сменить камеру</button>
+    <canvas id="c"></canvas>
+    <video id="v" autoplay playsinline style="display:none"></video>
 
-import cv2
-import numpy as np
-from IPython.display import display, Javascript
-from google.colab.output import eval_js
-from base64 import b64decode
-import PIL.Image
-import PIL.ImageDraw
-import PIL.ImageFont
+    <script>
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('v');
+        let width, height, columns, drops;
+        const fontSize = 16;
+        const numbers = "0123456789"; // Оставил только цифры для "Number Camera"
 
-# 1. Функция для захвата фото с камеры
-def take_photo(filename='photo.jpg', quality=0.8):
-  js = Javascript('''
-    async function takePhoto(quality) {
-      const div = document.createElement('div');
-      const video = document.createElement('video');
-      video.style.display = 'block';
-      const stream = await navigator.mediaDevices.getUserMedia({video: true});
-      document.body.appendChild(div);
-      div.appendChild(video);
-      video.srcObject = stream;
-      await video.play();
-      await new Promise((resolve) => {
-        const btn = document.createElement('button');
-        btn.textContent = 'Стать частью кода';
-        div.appendChild(btn);
-        btn.onclick = resolve;
-      });
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext('2d').drawImage(video, 0, 0);
-      stream.getVideoTracks()[0].stop();
-      div.remove();
-      return canvas.toDataURL('image/jpeg', quality);
-    }
-    ''')
-  display(js)
-  data = eval_js('takePhoto({})'.format(quality))
-  binary = b64decode(data.split(',')[1])
-  with open(filename, 'wb') as f:
-    f.write(binary)
-  return filename
+        async function init(mode = 'user') {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: mode }, audio: false
+            });
+            video.srcObject = stream;
+            resize();
+        }
 
-# 2. Превращаем фото в "Матрицу"
-try:
-    path = take_photo()
-    img = cv2.imread(path)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # Делаем ч/б для анализа яркости
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            columns = Math.floor(width / fontSize);
+            drops = new Array(columns).fill(1);
+        }
 
-    # Уменьшаем размер для эффекта "пиксельных цифр"
-    width = 100 
-    height = int(img.shape[0] * width / img.shape[1])
-    small_img = cv2.resize(img, (width, height))
-
-    # Создаем холст для финальной картинки
-    cell_size = 12
-    out_img = PIL.Image.new('RGB', (width * cell_size, height * cell_size), color='black')
-    draw = PIL.ImageDraw.Draw(out_img)
-    
-    # Можно попробовать загрузить шрифт, но стандартный тоже пойдет
-    symbols = "0123456789" 
-
-    for y in range(height):
-        for x in range(width):
-            brightness = small_img[y, x]
-            # Выбираем случайную цифру
-            char = symbols[np.random.randint(0, len(symbols))]
-            # Цвет: чем ярче пиксель, тем сочнее зеленый
-            color = (0, brightness, 0) 
-            draw.text((x * cell_size, y * cell_size), char, fill=color)
-
-    # Показываем результат
-    display(out_img)
-
-except Exception as err:
-    print(f"Ошибка: {err}")
+        function draw() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.
