@@ -2,170 +2,129 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Скриншот в Цифры</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Цифровая Камера ASCII</title>
     <style>
         body {
-            font-family: sans-serif;
-            background-color: #1a1a1a;
-            color: #eee;
+            margin: 0;
+            background-color: #000;
+            color: #0f0; /* Хакерский зеленый */
+            font-family: monospace;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 20px;
-            margin: 0;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
         }
-        h2 { color: #007AFF; }
-        .controls {
-            margin-bottom: 20px;
+        #ascii-layer {
+            font-size: 8px;
+            line-height: 7px;
+            letter-spacing: 1px;
+            white-space: pre;
             text-align: center;
-            width: 100%;
-            max-width: 400px;
+            background: black;
+            width: 100vw;
+            height: 80vh;
+            overflow: hidden;
         }
-        /* Стилизация кнопки выбора файла */
-        input[type="file"] {
-            display: none;
-        }
-        .custom-file-upload {
-            display: inline-block;
-            padding: 12px 24px;
-            cursor: pointer;
-            background-color: #333;
-            color: white;
-            border-radius: 8px;
-            margin-bottom: 10px;
+        .controls {
+            height: 20vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             width: 100%;
-            box-sizing: border-box;
-            border: 1px solid #444;
+            background: #111;
         }
         button {
-            padding: 12px 24px;
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #007AFF;
-            color: white;
+            padding: 15px 30px;
+            font-size: 18px;
+            background: #0f0;
+            color: #000;
             border: none;
-            border-radius: 8px;
-            width: 100%;
+            border-radius: 50px;
             font-weight: bold;
+            cursor: pointer;
         }
-        button:disabled {
-            background-color: #555;
-            cursor: not-allowed;
-        }
-        #ascii-result {
-            /* Самое важное: моноширинный шрифт и перенос строк */
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 8px; /* Мелкий шрифт для детализации */
-            line-height: 6px;
-            letter-spacing: 0px;
-            white-space: pre; /* Сохраняет пробелы и переносы */
-            background-color: black;
-            color: #00ff00; /* Классический хакерский зеленый */
-            padding: 10px;
-            border-radius: 5px;
-            overflow-x: auto; /* Скролл, если не влезает */
-            width: 100%;
-            max-width: 100%;
-            box-sizing: border-box;
-            display: none; /* Скрыт до генерации */
-        }
-        canvas { display: none; } /* Скрытый холст для обработки */
+        video, canvas { display: none; }
     </style>
 </head>
 <body>
 
-    <h2>Картинка в ASCII-арт</h2>
+    <div id="ascii-layer">Запуск камеры...</div>
 
-    <div class="controls">
-        <label for="fileInput" class="custom-file-upload">
-            Выбрать скриншот/фото
-        </label>
-        <input type="file" id="fileInput" accept="image/*">
-        
-        <br>
-        
-        <button id="convertBtn" onclick="processImage()" disabled>Превратить в циферки</button>
-    </div>
-
-    <pre id="ascii-result"></pre>
-    
+    <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
 
+    <div class="controls">
+        <button id="toggleBtn" onclick="toggleCamera()">ВКЛЮЧИТЬ КАМЕРУ</button>
+    </div>
+
     <script>
-        const fileInput = document.getElementById('fileInput');
-        const convertBtn = document.getElementById('convertBtn');
-        const resultPre = document.getElementById('ascii-result');
+        const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const asciiLayer = document.getElementById('ascii-layer');
+        const chars = "0123456789X#+- "; // Цифры для отрисовки
+        let animating = false;
 
-        // Набор символов: от темного к светлому
-        // const chars = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\|()1{}[]?-_+~<>i!lI;:,\"^`'. ";
-        const chars = "0123456789XW#+-:. "; // Более "цифровой" набор
-
-        // Активируем кнопку, когда файл выбран
-        fileInput.addEventListener('change', function() {
-            if (this.files && this.files[0]) {
-                convertBtn.disabled = false;
-                convertBtn.innerText = "Превратить в циферки";
-                resultPre.style.display = 'none'; // Скрываем старый результат
+        async function toggleCamera() {
+            if (animating) {
+                animating = false;
+                document.getElementById('toggleBtn').innerText = "ВКЛЮЧИТЬ";
+                return;
             }
-        });
 
-        function processImage() {
-            const file = fileInput.files[0];
-            if (!file) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" }, // Задняя камера
+                    audio: false 
+                });
+                video.srcObject = stream;
+                animating = true;
+                document.getElementById('toggleBtn').innerText = "ВЫКЛЮЧИТЬ";
+                requestAnimationFrame(render);
+            } catch (err) {
+                asciiLayer.innerText = "Ошибка: Доступ к камере запрещен";
+                console.error(err);
+            }
+        }
 
-            convertBtn.disabled = true;
-            convertBtn.innerText = "Обработка...";
+        function render() {
+            if (!animating) return;
 
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const img = new Image();
-                img.onload = function() {
-                    // 1. Масштабируем картинку. 
-                    // На телефоне нельзя делать слишком большую детализацию, зависнет.
-                    const width = 100; // Ширина в символах
-                    const scaleFactor = img.height / img.width;
-                    const height = Math.floor(width * scaleFactor * 0.55); // 0.55 коррекция высоты шрифта
+            // Настройки разрешения (чем меньше, тем быстрее работает)
+            const width = 80; 
+            const height = Math.floor(width * (video.videoHeight / video.videoWidth) * 0.5);
 
-                    canvas.width = width;
-                    canvas.height = height;
+            canvas.width = width;
+            canvas.height = height;
 
-                    // 2. Рисуем уменьшенную картинку на скрытом холсте
-                    ctx.drawImage(img, 0, 0, width, height);
+            // Рисуем кадр видео на скрытый холст
+            ctx.drawImage(video, 0, 0, width, height);
 
-                    // 3. Получаем данные о пикселях (RGBA)
-                    const imageData = ctx.getImageData(0, 0, width, height).data;
-                    let asciiArt = "";
+            // Получаем пиксели
+            const pixels = ctx.getImageData(0, 0, width, height).data;
+            let asciiFrame = "";
 
-                    // 4. Проходим по каждому пикселю
-                    for (let y = 0; y < height; y++) {
-                        for (let x = 0; x < width; x++) {
-                            const offset = (y * width + x) * 4;
-                            const r = imageData[offset];
-                            const g = imageData[offset + 1];
-                            const b = imageData[offset + 2];
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const i = (y * width + x) * 4;
+                    const r = pixels[i];
+                    const g = pixels[i+1];
+                    const b = pixels[i+2];
+                    
+                    // Яркость
+                    const brightness = (r + g + b) / 3;
+                    const charIdx = Math.floor((brightness / 255) * (chars.length - 1));
+                    
+                    asciiFrame += chars[charIdx];
+                }
+                asciiFrame += "\n";
+            }
 
-                            // Вычисляем яркость (серый цвет)
-                            const brightness = (r + g + b) / 3;
-
-                            // Подбираем символ по яркости
-                            const charIndex = Math.floor((brightness / 255) * (chars.length - 1));
-                            asciiArt += chars[charIndex];
-                        }
-                        asciiArt += "\n"; // Перенос строки
-                    }
-
-                    // 5. Выводим результат
-                    resultPre.textContent = asciiArt;
-                    resultPre.style.display = 'block';
-                    convertBtn.disabled = false;
-                    convertBtn.innerText = "Готово! Еще раз?";
-                };
-                img.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
+            asciiLayer.textContent = asciiFrame;
+            requestAnimationFrame(render);
         }
     </script>
 </body>
