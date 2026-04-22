@@ -2,38 +2,67 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Number Camera</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Camera</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: monospace; }
-        canvas { display: block; }
-        #btn { 
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            padding: 15px 25px; background: rgba(0, 255, 0, 0.2); color: #0f0;
-            border: 2px solid #0f0; border-radius: 30px; font-size: 16px; z-index: 100;
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: black;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        canvas {
+            display: block;
+        }
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 10;
+        }
+        button {
+            padding: 12px 20px;
+            font-size: 16px;
+            background: rgba(0, 255, 70, 0.2);
+            color: #00ff46;
+            border: 2px solid #00ff46;
+            border-radius: 5px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-family: monospace;
+            transition: 0.3s;
+        }
+        button:hover {
+            background: rgba(0, 255, 70, 0.5);
+            box-shadow: 0 0 15px #00ff46;
         }
     </style>
 </head>
 <body>
-    <button id="btn" onclick="switchCam()">Сменить камеру</button>
-    <canvas id="c"></canvas>
-    <video id="v" autoplay playsinline style="display:none"></video>
+
+    <canvas id="canvas"></canvas>
+
+    <div class="controls">
+        <button id="switchBtn">Сменить камеру</button>
+        <button id="startBtn">Стать частью кода</button>
+    </div>
 
     <script>
-        const canvas = document.getElementById('c');
+        const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const video = document.getElementById('v');
-        let width, height, columns, drops;
-        const fontSize = 16;
-        const numbers = "0123456789"; // Оставил только цифры для "Number Camera"
+        const video = document.createElement('video');
+        const switchBtn = document.getElementById('switchBtn');
+        const startBtn = document.getElementById('startBtn');
 
-        async function init(mode = 'user') {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: mode }, audio: false
-            });
-            video.srcObject = stream;
-            resize();
-        }
+        let width, height, columns;
+        const fontSize = 16;
+        const characters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        let drops = [];
+        let useFrontCamera = true;
+        let isMatrixActive = false;
 
         function resize() {
             width = canvas.width = window.innerWidth;
@@ -42,6 +71,92 @@
             drops = new Array(columns).fill(1);
         }
 
+        window.addEventListener('resize', resize);
+        resize();
+
+        async function initCamera() {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            const constraints = {
+                video: { facingMode: useFrontCamera ? "user" : "environment" }
+            };
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                video.play();
+            } catch (err) {
+                console.error("Ошибка камеры:", err);
+                alert("Не удалось включить камеру. Проверь разрешения.");
+            }
+        }
+
+        switchBtn.onclick = () => {
+            useFrontCamera = !useFrontCamera;
+            initCamera();
+        };
+
+        startBtn.onclick = () => {
+            isMatrixActive = true;
+            startBtn.style.display = 'none'; // Скрываем кнопку после активации
+        };
+
         function draw() {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-            ctx.
+            ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
+            ctx.fillRect(0, 0, width, height);
+
+            if (isMatrixActive && video.readyState === video.HAVE_ENOUGH_DATA) {
+                // Рисуем видео в скрытом режиме, чтобы брать пиксели
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = columns;
+                tempCanvas.height = Math.floor(height / fontSize);
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+                const pixelData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height).data;
+
+                ctx.font = fontSize + "px monospace";
+
+                for (let i = 0; i < drops.length; i++) {
+                    const char = characters[Math.floor(Math.random() * characters.length)];
+                    
+                    // Берем яркость пикселя из видео
+                    const pixelIndex = (Math.floor(drops[i]) * columns + i) * 4;
+                    const r = pixelData[pixelIndex];
+                    const g = pixelData[pixelIndex + 1];
+                    const b = pixelData[pixelIndex + 2];
+                    const brightness = (r + g + b) / 3;
+
+                    // Если место яркое (лицо), рисуем символ ярко-зеленым
+                    if (brightness > 50) {
+                        ctx.fillStyle = "#0f0";
+                    } else {
+                        ctx.fillStyle = "#003300"; // Темный фон
+                    }
+
+                    ctx.fillText(char, i * fontSize, drops[i] * fontSize);
+
+                    if (drops[i] * fontSize > height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i]++;
+                }
+            } else {
+                // Пока не нажата кнопка, просто показываем видео (зеркально)
+                ctx.save();
+                ctx.translate(width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0, width, height);
+                ctx.restore();
+                
+                ctx.fillStyle = "#0f0";
+                ctx.font = "20px monospace";
+                ctx.fillText("КАМЕРА ГОТОВА. НАЖМИ КНОПКУ.", width/2 - 150, height/2);
+            }
+            requestAnimationFrame(draw);
+        }
+
+        initCamera();
+        draw();
+    </script>
+</body>
+</html>
