@@ -2,96 +2,170 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mafia Mobile Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Скриншот в Цифры</title>
     <style>
         body {
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: sans-serif;
             background-color: #1a1a1a;
-            color: #ffffff;
-            margin: 0;
+            color: #eee;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            overflow: hidden;
+            padding: 20px;
+            margin: 0;
         }
-        .game-card {
-            width: 85%;
-            max-width: 400px;
-            background: #2d2d2d;
-            padding: 30px;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        h2 { color: #007AFF; }
+        .controls {
+            margin-bottom: 20px;
             text-align: center;
+            width: 100%;
+            max-width: 400px;
+        }
+        /* Стилизация кнопки выбора файла */
+        input[type="file"] {
+            display: none;
+        }
+        .custom-file-upload {
+            display: inline-block;
+            padding: 12px 24px;
+            cursor: pointer;
+            background-color: #333;
+            color: white;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            width: 100%;
+            box-sizing: border-box;
             border: 1px solid #444;
         }
-        h1 { color: #e74c3c; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
-        .role-display {
-            font-size: 24px;
-            font-weight: bold;
-            margin: 20px 0;
-            padding: 20px;
-            border: 2px dashed #555;
-            border-radius: 10px;
-            min-height: 30px;
-        }
         button {
-            background-color: #e74c3c;
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007AFF;
             color: white;
             border: none;
-            padding: 15px 30px;
-            font-size: 18px;
-            font-weight: bold;
-            border-radius: 50px;
-            cursor: pointer;
+            border-radius: 8px;
             width: 100%;
-            transition: transform 0.1s, background-color 0.2s;
-            -webkit-tap-highlight-color: transparent;
+            font-weight: bold;
         }
-        button:active {
-            transform: scale(0.95);
-            background-color: #c0392b;
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
         }
-        .status { color: #888; margin-top: 15px; font-size: 14px; }
+        #ascii-result {
+            /* Самое важное: моноширинный шрифт и перенос строк */
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 8px; /* Мелкий шрифт для детализации */
+            line-height: 6px;
+            letter-spacing: 0px;
+            white-space: pre; /* Сохраняет пробелы и переносы */
+            background-color: black;
+            color: #00ff00; /* Классический хакерский зеленый */
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto; /* Скролл, если не влезает */
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            display: none; /* Скрыт до генерации */
+        }
+        canvas { display: none; } /* Скрытый холст для обработки */
     </style>
 </head>
 <body>
 
-    <div class="game-card">
-        <h1>Мафия</h1>
-        <div id="screen">
-            <p>Нажмите кнопку, чтобы узнать свою роль в этом раунде</p>
-            <div class="role-display" id="roleText">???</div>
-            <button onclick="getRole()">УЗНАТЬ РОЛЬ</button>
-        </div>
-        <p class="status" id="statusInfo">Готов к началу игры</p>
+    <h2>Картинка в ASCII-арт</h2>
+
+    <div class="controls">
+        <label for="fileInput" class="custom-file-upload">
+            Выбрать скриншот/фото
+        </label>
+        <input type="file" id="fileInput" accept="image/*">
+        
+        <br>
+        
+        <button id="convertBtn" onclick="processImage()" disabled>Превратить в циферки</button>
     </div>
 
+    <pre id="ascii-result"></pre>
+    
+    <canvas id="canvas"></canvas>
+
     <script>
-        const roles = [
-            {name: "МАФИЯ", color: "#e74c3c", msg: "Твоя цель — устранить мирных жителей."},
-            {name: "МИРНЫЙ ЖИТЕЛЬ", color: "#2ecc71", msg: "Найди мафию, пока не стало слишком поздно."},
-            {name: "ШЕРИФ", color: "#3498db", msg: "Ты можешь проверять игроков ночью."},
-            {name: "ДОКТОР", color: "#f1c40f", msg: "Выбери, кого спасти этой ночью."}
-        ];
+        const fileInput = document.getElementById('fileInput');
+        const convertBtn = document.getElementById('convertBtn');
+        const resultPre = document.getElementById('ascii-result');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
 
-        function getRole() {
-            const display = document.getElementById('roleText');
-            const status = document.getElementById('statusInfo');
-            
-            // Вибрация для мобильных устройств (если поддерживается)
-            if (navigator.vibrate) navigator.vibrate(50);
+        // Набор символов: от темного к светлому
+        // const chars = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\|()1{}[]?-_+~<>i!lI;:,\"^`'. ";
+        const chars = "0123456789XW#+-:. "; // Более "цифровой" набор
 
-            // Случайный выбор роли
-            const randomRole = roles[Math.floor(Math.random() * roles.length)];
-            
-            display.innerText = randomRole.name;
-            display.style.color = randomRole.color;
-            display.style.borderColor = randomRole.color;
-            
-            status.innerText = randomRole.msg;
+        // Активируем кнопку, когда файл выбран
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                convertBtn.disabled = false;
+                convertBtn.innerText = "Превратить в циферки";
+                resultPre.style.display = 'none'; // Скрываем старый результат
+            }
+        });
+
+        function processImage() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            convertBtn.disabled = true;
+            convertBtn.innerText = "Обработка...";
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    // 1. Масштабируем картинку. 
+                    // На телефоне нельзя делать слишком большую детализацию, зависнет.
+                    const width = 100; // Ширина в символах
+                    const scaleFactor = img.height / img.width;
+                    const height = Math.floor(width * scaleFactor * 0.55); // 0.55 коррекция высоты шрифта
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    // 2. Рисуем уменьшенную картинку на скрытом холсте
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // 3. Получаем данные о пикселях (RGBA)
+                    const imageData = ctx.getImageData(0, 0, width, height).data;
+                    let asciiArt = "";
+
+                    // 4. Проходим по каждому пикселю
+                    for (let y = 0; y < height; y++) {
+                        for (let x = 0; x < width; x++) {
+                            const offset = (y * width + x) * 4;
+                            const r = imageData[offset];
+                            const g = imageData[offset + 1];
+                            const b = imageData[offset + 2];
+
+                            // Вычисляем яркость (серый цвет)
+                            const brightness = (r + g + b) / 3;
+
+                            // Подбираем символ по яркости
+                            const charIndex = Math.floor((brightness / 255) * (chars.length - 1));
+                            asciiArt += chars[charIndex];
+                        }
+                        asciiArt += "\n"; // Перенос строки
+                    }
+
+                    // 5. Выводим результат
+                    resultPre.textContent = asciiArt;
+                    resultPre.style.display = 'block';
+                    convertBtn.disabled = false;
+                    convertBtn.innerText = "Готово! Еще раз?";
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
         }
     </script>
 </body>
