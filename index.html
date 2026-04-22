@@ -46,17 +46,27 @@ async function start() {
 
 // 📷 камера
 async function startCamera() {
-  if (stream) {
-    stream.getTracks().forEach(t => t.stop());
+  try {
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+    }
+
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: useFront ? "user" : "environment"
+      },
+      audio: false
+    });
+
+    video.srcObject = stream;
+
+    await video.play(); // 🔥 важно — принудительный запуск
+
+  } catch (e) {
+    alert("Камера не запустилась: " + e.message);
+    console.log(e);
   }
-
-  stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: useFront ? "user" : "environment" }
-  });
-
-  video.srcObject = stream;
 }
-
 // 🔁 камера
 function switchCam() {
   useFront = !useFront;
