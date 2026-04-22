@@ -2,162 +2,103 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Matrix Camera Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Matrix Camera FIX</title>
     <style>
-        /* Полностью чёрный фон всего приложения */
         body {
             margin: 0;
             background-color: #000;
-            overflow: hidden;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            color: #000; /* Изначально текст скрыт */
+            overflow: hidden;
         }
-
-        /* Область вывода ASCII (зелёные цифры на чёрном) */
         #ascii-layer {
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 9px; /* Размер шрифта для детализации */
-            line-height: 7px; /* Межстрочный интервал */
-            letter-spacing: 0px;
+            font-size: 8px;
+            line-height: 7px;
             white-space: pre;
             text-align: center;
-            
-            /* Эффект свечения */
-            color: #00ff00; 
-            text-shadow: 0 0 3px #00ff00;
-            
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-            background-color: #000;
+            width: 100%;
+            height: 100%;
+            display: block;
+            text-shadow: 0 0 5px #0f0;
+        }
+        #btn {
             position: absolute;
-            top: 0;
-            left: 0;
-            display: none; /* Появится при запуске */
-        }
-
-        /* Кнопка запуска */
-        #startBtn {
-            position: relative;
-            z-index: 10;
-            padding: 20px 40px;
-            font-size: 18px;
-            background: #000;
-            color: #0f0;
-            border: 2px solid #0f0;
-            border-radius: 10px;
+            z-index: 100;
+            padding: 20px;
+            background: #0f0;
+            color: #000;
+            border: none;
             font-weight: bold;
-            cursor: pointer;
-            text-transform: uppercase;
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
-            -webkit-tap-highlight-color: transparent;
+            border-radius: 10px;
         }
-        #startBtn:active { transform: scale(0.98); background: #002200; }
-
-        video, canvas { display: none; } /* Скрытые технические элементы */
+        video, canvas { position: absolute; visibility: hidden; pointer-events: none; }
     </style>
 </head>
 <body>
 
+    <button id="btn" onclick="start()">ЗАПУСТИТЬ МАТРИЦУ</button>
     <pre id="ascii-layer"></pre>
 
-    <video id="video" autoplay playsinline></video>
+    <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
-
-    <button id="startBtn" onclick="toggleCamera()">ПОДКЛЮЧИТЬСЯ К МАТРИЦЕ</button>
 
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
-        // willReadFrequently оптимизирует canvas для постоянного чтения пикселей
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        const asciiLayer = document.getElementById('ascii-layer');
-        const startBtn = document.getElementById('startBtn');
+        const layer = document.getElementById('ascii-layer');
+        const chars = ["#", "8", "0", "1", "7", "+", ":", "-", ".", " "];
 
-        // Набор символов (цифры + знаки)
-        // const chars = "0123456789X+-. "; // Яркость -> Символ
-        // chars = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\|()1{}[]?-_+~<>i!lI;:,\"^`'. ";
-
-        let animating = false;
-
-        async function toggleCamera() {
-            if (animating) {
-                location.reload(); // Простой способ выключить
-                return;
-            }
-
+        async function start() {
+            document.getElementById('btn').style.display = 'none';
             try {
-                // Запрашиваем только видео, facingMode "environment" - задняя камера iPhone
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: "environment" }, 
                     audio: false 
                 });
-                
                 video.srcObject = stream;
-                animating = true;
                 
-                // Скрываем кнопку и показываем слой с цифрами
-                startBtn.style.display = 'none';
-                asciiLayer.style.display = 'block';
-                
-                requestAnimationFrame(render); // Начинаем цикл отрисовки
+                // Ждем, пока видео реально начнет отдавать кадры
+                video.onloadedmetadata = () => {
+                    video.play();
+                    render();
+                };
             } catch (err) {
-                alert("Ошибка доступа к камере. Матрица заблокирована.");
-                console.error(err);
+                alert("Нет доступа к камере!");
             }
         }
 
         function render() {
-            if (!animating) return;
+            // Если видео не готово, ждем
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                const w = 80; 
+                const h = Math.floor(w * (video.videoHeight / video.videoWidth) * 0.5);
+                
+                canvas.width = w;
+                canvas.height = h;
+                ctx.drawImage(video, 0, 0, w, h);
 
-            // --- Настройки Разрешения ---
-            // Чем больше width, тем выше детализация, но ниже FPS на телефоне.
-            const width = 90; 
-            const height = Math.floor(width * (video.videoHeight / video.videoWidth) * 0.6); // 0.6 коррекция высоты шрифта
+                const data = ctx.getImageData(0, 0, w, h).data;
+                let res = "";
 
-            canvas.width = width;
-            canvas.height = height;
-
-            // 1. Рисуем текущий кадр видео на скрытый холст
-            ctx.drawImage(video, 0, 0, width, height);
-
-            // 2. Получаем массив пикселей (RGBA)
-            const pixels = ctx.getImageData(0, 0, width, height).data;
-            
-            // Набор символов для отрисовки
-            const chars = ["1", "0", "4", "7", "9", "X", "#", "+", "-", " "];
-
-            let asciiFrame = "";
-
-            // 3. Алгоритм обработки пикселей
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const i = (y * width + x) * 4; // Индекс текущего пикселя (R)
-                    
-                    const r = pixels[i];
-                    const g = pixels[i+1];
-                    const b = pixels[i+2];
-                    
-                    // Яркость (GrayScale)
-                    const brightness = (r + g + b) / 3;
-
-                    // --- МАГИЯ ЯРКОСТИ ---
-                    // Находим индекс символа: чем ярче пиксель, тем "плотнее" символ
-                    const charIdx = Math.floor((brightness / 255) * (chars.length - 1));
-                    
-                    asciiFrame += chars[charIdx];
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        const i = (y * w + x) * 4;
+                        // Считаем яркость
+                        const bright = (data[i] + data[i+1] + data[i+2]) / 3;
+                        // Чем ярче, тем "гуще" символ (инвертируем для черного фона)
+                        const charIdx = Math.floor((bright / 255) * (chars.length - 1));
+                        res += chars[charIdx];
+                    }
+                    res += "\n";
                 }
-                asciiFrame += "\n"; // Перенос строки в конце ряда
+                layer.textContent = res;
             }
-
-            // 4. Выводим готовый текстовый кадр на экран
-            asciiLayer.textContent = asciiFrame;
-            
-            // Запускаем следующий цикл на следующем кадре
             requestAnimationFrame(render);
         }
     </script>
