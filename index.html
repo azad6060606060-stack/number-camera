@@ -1,3 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Matrix Camera FIX</title>
+
+<style>
+body {
+    background: black;
+    color: lime;
+    text-align: center;
+    font-family: monospace;
+}
+
+button {
+    margin: 10px;
+    padding: 12px 18px;
+    font-size: 16px;
+    background: lime;
+    color: black;
+    border: none;
+    border-radius: 6px;
+}
+
+canvas {
+    display: block;
+    margin: auto;
+    border: 1px solid green;
+}
+</style>
+</head>
+
+<body>
+
+<h2>📷 Matrix Camera</h2>
+
+<button onclick="startCamera()">Start</button>
+<button onclick="switchCamera()">Switch</button>
+
+<canvas id="canvas"></canvas>
+
 <script>
 let video = document.createElement('video');
 let canvas = document.getElementById('canvas');
@@ -9,13 +50,13 @@ let currentIndex = 0;
 
 ctx.font = "10px monospace";
 
-// получаем список камер
+// получить камеры
 async function getCameras() {
     let all = await navigator.mediaDevices.enumerateDevices();
     devices = all.filter(d => d.kind === "videoinput");
 }
 
-// запуск камеры
+// старт камеры
 async function startCamera() {
     try {
         if (stream) {
@@ -24,6 +65,11 @@ async function startCamera() {
 
         if (devices.length === 0) {
             await getCameras();
+        }
+
+        if (devices.length === 0) {
+            alert("Камера не найдена");
+            return;
         }
 
         let deviceId = devices[currentIndex].deviceId;
@@ -42,7 +88,7 @@ async function startCamera() {
         };
 
     } catch (e) {
-        alert("Ошибка камеры: " + e.message);
+        alert("Ошибка: " + e.message);
         console.error(e);
     }
 }
@@ -57,9 +103,9 @@ function switchCamera() {
     }
 }
 
-// отрисовка
+// рисование матрицы
 function draw() {
-    if (video.readyState !== 4) {
+    if (video.readyState < 2) {
         requestAnimationFrame(draw);
         return;
     }
@@ -84,9 +130,9 @@ function draw() {
             let b = data[i+2];
 
             let brightness = (r + g + b) / 3;
-            brightness = brightness < 120 ? brightness / 2 : brightness;
 
-            let num = Math.floor(brightness / 25);
+            // нормальный контраст (без "белого экрана")
+            let num = Math.floor(brightness / 32);
 
             ctx.fillStyle = rgb(0, ${brightness}, 0);
             ctx.fillText(num, x, y + size);
@@ -96,3 +142,6 @@ function draw() {
     requestAnimationFrame(draw);
 }
 </script>
+
+</body>
+</html>
