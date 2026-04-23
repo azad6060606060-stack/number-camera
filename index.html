@@ -1,3 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Matrix Camera</title>
+
+<style>
+body {
+    background: black;
+    color: lime;
+    text-align: center;
+    font-family: monospace;
+}
+
+button {
+    margin: 10px;
+    padding: 12px;
+    font-size: 16px;
+    background: lime;
+    color: black;
+    border: none;
+    border-radius: 6px;
+}
+
+canvas {
+    display: block;
+    margin: auto;
+}
+</style>
+</head>
+
+<body>
+
+<h2>📷 Matrix Camera</h2>
+
+<button onclick="startCamera()">Start</button>
+<button onclick="switchCamera()">Switch</button>
+
+<canvas id="canvas"></canvas>
+
 <script>
 let video = document.createElement('video');
 let canvas = document.getElementById('canvas');
@@ -19,10 +59,8 @@ async function startCamera() {
         });
 
         video.srcObject = stream;
-
         await video.play();
 
-        // ЖДЁМ пока реально появится картинка
         video.onloadeddata = () => {
             canvas.width = 320;
             canvas.height = 240;
@@ -31,7 +69,6 @@ async function startCamera() {
 
     } catch (e) {
         alert(e.message);
-        console.error(e);
     }
 }
 
@@ -41,7 +78,7 @@ function switchCamera() {
 }
 
 function draw() {
-    if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+    if (video.readyState !== 4) {
         requestAnimationFrame(draw);
         return;
     }
@@ -65,13 +102,15 @@ function draw() {
             let g = data[i+1];
             let b = data[i+2];
 
+            // нормальная яркость (не белая!)
             let brightness = (r + g + b) / 3;
+
+            // усиливаем контраст
+            brightness = brightness < 120 ? brightness / 2 : brightness;
 
             let num = Math.floor(brightness / 25);
 
-            // ВАЖНО: делаем текст ярче и видимее
-            ctx.fillStyle = rgb(0, ${brightness + 0}, 0);
-
+            ctx.fillStyle = rgb(0, ${brightness}, 0);
             ctx.fillText(num, x, y + size);
         }
     }
@@ -79,3 +118,6 @@ function draw() {
     requestAnimationFrame(draw);
 }
 </script>
+
+</body>
+</html>
