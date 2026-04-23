@@ -63,19 +63,8 @@ async function startCamera() {
             stream.getTracks().forEach(t => t.stop());
         }
 
-        if (devices.length === 0) {
-            await getCameras();
-        }
-
-        if (devices.length === 0) {
-            alert("Камера не найдена");
-            return;
-        }
-
-        let deviceId = devices[currentIndex].deviceId;
-
         stream = await navigator.mediaDevices.getUserMedia({
-            video: { deviceId: { exact: deviceId } }
+            video: { facingMode: currentIndex === 0 ? "user" : "environment" }
         });
 
         video.srcObject = stream;
@@ -88,21 +77,15 @@ async function startCamera() {
         };
 
     } catch (e) {
-        alert("Ошибка: " + e.message);
+        alert("Camera error: " + e.message);
         console.error(e);
     }
 }
 
-// переключение камеры
 function switchCamera() {
-    if (devices.length > 1) {
-        currentIndex = (currentIndex + 1) % devices.length;
-        startCamera();
-    } else {
-        alert("Только одна камера");
-    }
+    currentIndex = currentIndex === 0 ? 1 : 0;
+    startCamera();
 }
-
 // рисование матрицы
 function draw() {
     if (video.readyState < 2) {
