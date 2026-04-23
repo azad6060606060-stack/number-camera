@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Matrix Camera</title>
+    <title>Matrix Camera FIX</title>
     <style>
         body {
             background: black;
@@ -15,7 +15,6 @@
         button {
             margin: 10px;
             padding: 10px;
-            font-size: 16px;
         }
     </style>
 </head>
@@ -23,8 +22,8 @@
 
 <h2>📷 Matrix Camera</h2>
 
-<button onclick="startCamera()">Start Camera</button>
-<button onclick="switchCamera()">Switch Camera</button>
+<button onclick="startCamera()">Start</button>
+<button onclick="switchCamera()">Switch</button>
 
 <br>
 <canvas id="canvas"></canvas>
@@ -34,24 +33,33 @@ let video = document.createElement('video');
 let canvas = document.getElementById('canvas');
 let ctx = canvas.getContext('2d');
 
-let currentCamera = "user"; // фронтальная
+let stream = null;
+let currentCamera = "user";
+
+ctx.font = "8px monospace";
 
 async function startCamera() {
     try {
-        let stream = await navigator.mediaDevices.getUserMedia({
+        // ОСТАНАВЛИВАЕМ старую камеру
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+
+        stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: currentCamera }
         });
 
         video.srcObject = stream;
-        video.play();
+        await video.play();
 
-        video.onloadedmetadata = () => {
-            canvas.width = 320;
-            canvas.height = 240;
-            draw();
-        };
+        canvas.width = 320;
+        canvas.height = 240;
+
+        draw();
+
     } catch (e) {
-        alert("Ошибка камеры: " + e);
+        alert("Ошибка: " + e.message);
+        console.error(e);
     }
 }
 
@@ -63,31 +71,29 @@ function switchCamera() {
 function draw() {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    let data = imageData.data;
+    let img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let data = img.data;
 
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    let cellSize = 8;
+    let size = 8;
 
-    for (let y = 0; y < canvas.height; y += cellSize) {
-        for (let x = 0; x < canvas.width; x += cellSize) {
+    for (let y = 0; y < canvas.height; y += size) {
+        for (let x = 0; x < canvas.width; x += size) {
 
-            let index = (y * canvas.width + x) * 4;
+            let i = (y * canvas.width + x) * 4;
 
-            let r = data[index];
-            let g = data[index + 1];
-            let b = data[index + 2];
+            let r = data[i];
+            let g = data[i+1];
+            let b = data[i+2];
 
             let brightness = (r + g + b) / 3;
 
-            let digit = Math.floor(brightness / 25);
+            let num = Math.floor(brightness / 25);
 
-            // чем светлее — тем ярче зелёный
             ctx.fillStyle = rgb(0, ${brightness}, 0);
-
-            ctx.fillText(digit, x, y);
+            ctx.fillText(num, x, y);
         }
     }
 
