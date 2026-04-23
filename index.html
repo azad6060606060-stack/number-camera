@@ -1,24 +1,81 @@
-<!DOCTYPE html>
-<html>
-<body style="background:black;color:white;text-align:center">
-
-<h2>Camera Test</h2>
-<button onclick="start()">Start</button>
-
-<br><br>
-<video id="v" autoplay playsinline width="300"></video>
-
 <script>
-async function start() {
+let video = document.createElement('video');
+let canvas = document.getElementById('canvas');
+let ctx = canvas.getContext('2d');
+
+let stream = null;
+let currentCamera = "user";
+
+ctx.font = "10px monospace";
+
+async function startCamera() {
     try {
-        let stream = await navigator.mediaDevices.getUserMedia({video:true});
-        document.getElementById("v").srcObject = stream;
-    } catch(e) {
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+        }
+
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: currentCamera }
+        });
+
+        video.srcObject = stream;
+
+        await video.play();
+
+        // ЖДЁМ пока реально появится картинка
+        video.onloadeddata = () => {
+            canvas.width = 320;
+            canvas.height = 240;
+            draw();
+        };
+
+    } catch (e) {
         alert(e.message);
         console.error(e);
     }
 }
-</script>
 
-</body>
-</html>
+function switchCamera() {
+    currentCamera = currentCamera === "user" ? "environment" : "user";
+    startCamera();
+}
+
+function draw() {
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+        requestAnimationFrame(draw);
+        return;
+    }
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    let img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let data = img.data;
+
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    let size = 8;
+
+    for (let y = 0; y < canvas.height; y += size) {
+        for (let x = 0; x < canvas.width; x += size) {
+
+            let i = (y * canvas.width + x) * 4;
+
+            let r = data[i];
+            let g = data[i+1];
+            let b = data[i+2];
+
+            let brightness = (r + g + b) / 3;
+
+            let num = Math.floor(brightness / 25);
+
+            // ВАЖНО: делаем текст ярче и видимее
+            ctx.fillStyle = rgb(0, ${brightness + 50}, 0);
+
+            ctx.fillText(num, x, y + size);
+        }
+    }
+
+    requestAnimationFrame(draw);
+}
+</script>
