@@ -1,103 +1,22 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Matrix Camera FIX</title>
-    <style>
-        body {
-            background: black;
-            color: lime;
-            text-align: center;
-            font-family: monospace;
-        }
-        canvas {
-            border: 1px solid green;
-        }
-        button {
-            margin: 10px;
-            padding: 10px;
-        }
-    </style>
-</head>
-<body>
+<body style="background:black;color:white;text-align:center">
 
-<h2>📷 Matrix Camera</h2>
+<h2>Camera Test</h2>
+<button onclick="start()">Start</button>
 
-<button onclick="startCamera()">Start</button>
-<button onclick="switchCamera()">Switch</button>
-
-<br>
-<canvas id="canvas"></canvas>
+<br><br>
+<video id="v" autoplay playsinline width="300"></video>
 
 <script>
-let video = document.createElement('video');
-let canvas = document.getElementById('canvas');
-let ctx = canvas.getContext('2d');
-
-let stream = null;
-let currentCamera = "user";
-
-ctx.font = "8px monospace";
-
-async function startCamera() {
+async function start() {
     try {
-        // ОСТАНАВЛИВАЕМ старую камеру
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-        }
-
-        stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: currentCamera }
-        });
-
-        video.srcObject = stream;
-        await video.play();
-
-        canvas.width = 320;
-        canvas.height = 240;
-
-        draw();
-
-    } catch (e) {
-        alert("Ошибка: " + e.message);
+        let stream = await navigator.mediaDevices.getUserMedia({video:true});
+        document.getElementById("v").srcObject = stream;
+    } catch(e) {
+        alert(e.message);
         console.error(e);
     }
-}
-
-function switchCamera() {
-    currentCamera = (currentCamera === "user") ? "environment" : "user";
-    startCamera();
-}
-
-function draw() {
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    let img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    let data = img.data;
-
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    let size = 8;
-
-    for (let y = 0; y < canvas.height; y += size) {
-        for (let x = 0; x < canvas.width; x += size) {
-
-            let i = (y * canvas.width + x) * 4;
-
-            let r = data[i];
-            let g = data[i+1];
-            let b = data[i+2];
-
-            let brightness = (r + g + b) / 3;
-
-            let num = Math.floor(brightness / 25);
-
-            ctx.fillStyle = rgb(0, ${brightness}, 0);
-            ctx.fillText(num, x, y);
-        }
-    }
-
-    requestAnimationFrame(draw);
 }
 </script>
 
