@@ -1,61 +1,35 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Matrix Camera</title>
-
-<style>
-body {
-    background: black;
-    color: lime;
-    text-align: center;
-    font-family: monospace;
-}
-
-button {
-    margin: 10px;
-    padding: 12px;
-    font-size: 16px;
-    background: lime;
-    color: black;
-    border: none;
-    border-radius: 6px;
-}
-
-canvas {
-    display: block;
-    margin: auto;
-}
-</style>
-</head>
-
-<body>
-
-<h2>📷 Matrix Camera</h2>
-
-<button onclick="startCamera()">Start</button>
-<button onclick="switchCamera()">Switch</button>
-
-<canvas id="canvas"></canvas>
-
 <script>
 let video = document.createElement('video');
 let canvas = document.getElementById('canvas');
 let ctx = canvas.getContext('2d');
 
 let stream = null;
-let currentCamera = "user";
+let devices = [];
+let currentIndex = 0;
 
 ctx.font = "10px monospace";
 
+// получаем список камер
+async function getCameras() {
+    let all = await navigator.mediaDevices.enumerateDevices();
+    devices = all.filter(d => d.kind === "videoinput");
+}
+
+// запуск камеры
 async function startCamera() {
     try {
         if (stream) {
             stream.getTracks().forEach(t => t.stop());
         }
 
+        if (devices.length === 0) {
+            await getCameras();
+        }
+
+        let deviceId = devices[currentIndex].deviceId;
+
         stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: currentCamera }
+            video: { deviceId: { exact: deviceId } }
         });
 
         video.srcObject = stream;
@@ -68,15 +42,22 @@ async function startCamera() {
         };
 
     } catch (e) {
-        alert(e.message);
+        alert("Ошибка камеры: " + e.message);
+        console.error(e);
     }
 }
 
+// переключение камеры
 function switchCamera() {
-    currentCamera = currentCamera === "user" ? "environment" : "user";
-    startCamera();
+    if (devices.length > 1) {
+        currentIndex = (currentIndex + 1) % devices.length;
+        startCamera();
+    } else {
+        alert("Только одна камера");
+    }
 }
 
+// отрисовка
 function draw() {
     if (video.readyState !== 4) {
         requestAnimationFrame(draw);
@@ -102,10 +83,7 @@ function draw() {
             let g = data[i+1];
             let b = data[i+2];
 
-            // нормальная яркость (не белая!)
             let brightness = (r + g + b) / 3;
-
-            // усиливаем контраст
             brightness = brightness < 120 ? brightness / 2 : brightness;
 
             let num = Math.floor(brightness / 25);
@@ -118,6 +96,3 @@ function draw() {
     requestAnimationFrame(draw);
 }
 </script>
-
-</body>
-</html>
